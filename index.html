@@ -1,16 +1,34 @@
 <!doctype html>
 <html lang="en">
- <head><script>window["__codeletBootstrap__"]=JSON.parse('{"A":"A","B":"20260714-23-4d5d8ed"}');</script><script src="/_sdk/f432b76fb310b513.telemetry_sdk.js" integrity="sha512-9FJQ55EKmmqhyyik8BhrMVfm0+iYYfb8uOlRsjtkxJMEI97qOVEI4PnHohDjQAtvAep0IOEpdQ64eki0sz62ug=="></script>
+ <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Space Invaders: Earth Science Edition</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&family=Press+Start+2P&display=swap" rel="stylesheet">
   <style>
+        :root {
+            --bg-primary: #0a0a0a;
+            --panel-purple: #1a0a2e;
+            --panel-purple-dark: #120820;
+            --border-purple: #6a0572;
+            --accent-pink: #e94560;
+            --accent-pink-bright: #ff5c7a;
+            --blue-highlight: #00d4ff;
+            --gold: #d4af37;
+            --green-success: #2ecc71;
+            --red-damage: #e74c3c;
+            --font-ui: 'Lexend', sans-serif;
+            --font-title: 'Press Start 2P', 'Courier New', monospace;
+        }
+
         body {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            background: linear-gradient(180deg, #0a0a2e 0%, #16213e 50%, #1a1a3a 100%);
-            font-family: 'Courier New', monospace;
+            background: var(--bg-primary);
+            font-family: var(--font-ui);
             color: white;
             overflow: hidden;
             height: 100%;
@@ -25,6 +43,16 @@
             width: 100vw;
             height: 100vh;
             overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #canvasFrame {
+            position: relative;
+            width: 800px;
+            height: 600px;
+            transform-origin: center center;
         }
 
         #gameCanvas {
@@ -32,91 +60,126 @@
             background: transparent;
         }
 
-        #ui {
+        /* ===== HUD ===== */
+        #hud-left, #hud-right {
             position: absolute;
-            top: 20px;
-            left: 20px;
+            top: 14px;
             z-index: 100;
-            font-size: 18px;
+            font-family: var(--font-ui);
+            font-size: 14px;
+            font-weight: 500;
+            color: white;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            background: linear-gradient(135deg, rgba(26,10,46,0.75) 0%, rgba(18,8,32,0.75) 100%);
+            border: 1px solid var(--border-purple);
+            border-radius: 10px;
+            padding: 8px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            line-height: 1.4;
         }
 
+        #hud-left { left: 14px; align-items: flex-start; }
+        #hud-right { right: 14px; align-items: flex-end; text-align: right; }
+
+        .hud-row { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+        .hud-sub { font-size: 11px; color: #b8a6c9; margin-left: 6px; }
+        .hud-value { color: var(--gold); font-weight: 600; }
+
+        /* ===== Panels / Modals ===== */
         .modal {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(0, 20, 40, 0.95);
-            border: 3px solid #00ffff;
-            border-radius: 15px;
+            background: linear-gradient(160deg, var(--panel-purple) 0%, var(--panel-purple-dark) 100%);
+            border: 3px solid var(--border-purple);
+            border-radius: 16px;
             padding: 30px;
             z-index: 200;
             display: none;
             max-width: 600px;
-            box-shadow: 0 0 30px rgba(0, 255, 255, 0.5);
+            box-shadow: 0 0 35px rgba(106, 5, 114, 0.7), inset 0 0 50px rgba(106, 5, 114, 0.12);
             text-align: center;
+            font-family: var(--font-ui);
         }
 
-        #quiz {
-            border-color: #ff00ff;
-            box-shadow: 0 0 30px rgba(255, 0, 255, 0.5);
-        }
-
-        #gameOver {
-            border-color: #ff0000;
-            box-shadow: 0 0 30px rgba(255, 0, 0, 0.5);
+        #quiz, #gameOver, #shop, #welcomeScreen {
+            border-color: var(--border-purple);
+            box-shadow: 0 0 35px rgba(106, 5, 114, 0.7), inset 0 0 50px rgba(106, 5, 114, 0.12);
         }
 
         #shop {
-            border-color: #00ff00;
-            box-shadow: 0 0 30px rgba(0, 255, 0, 0.5);
             max-width: 700px;
         }
 
+        .modal h1 {
+            font-family: var(--font-title);
+            font-size: 35px;
+            line-height: 1.5;
+        }
+
+        .modal h2 {
+            font-family: var(--font-title);
+            font-size: 30px;
+            line-height: 1.5;
+        }
+
+        .modal h3 {
+            font-size: 16px;
+        }
+
         .option {
-            background: rgba(255, 255, 255, 0.1);
-            border: 2px solid #00ffff;
+            background: rgba(255, 255, 255, 0.06);
+            border: 2px solid var(--blue-highlight);
             border-radius: 8px;
             padding: 15px;
             margin: 10px 0;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
+            font-size: 16px;
         }
 
         .option:hover {
-            background: rgba(0, 255, 255, 0.2);
+            background: rgba(0, 212, 255, 0.15);
             transform: scale(1.02);
         }
 
         .quiz-option {
-            border-color: #ff00ff;
+            border-color: var(--accent-pink);
+            font-size: 18px;
         }
 
         .quiz-option:hover {
-            background: rgba(255, 0, 255, 0.2);
+            background: rgba(233, 69, 96, 0.18);
         }
 
         button {
-            background: linear-gradient(45deg, #00ffff, #0080ff);
-            border: none;
+            background: linear-gradient(145deg, var(--border-purple), #4a0350);
+            border: 2px solid var(--accent-pink);
             border-radius: 8px;
             padding: 12px 24px;
             color: white;
-            font-family: 'Courier New', monospace;
+            font-family: var(--font-ui);
+            font-weight: 600;
             font-size: 16px;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
             margin: 10px;
         }
 
         button:hover {
             transform: scale(1.05);
-            box-shadow: 0 0 15px rgba(0, 255, 255, 0.5);
+            border-color: var(--accent-pink-bright);
+            background: linear-gradient(145deg, #7d0688, #5a0460);
+            box-shadow: 0 0 15px rgba(233, 69, 96, 0.6);
         }
 
         .timer {
             font-size: 24px;
-            color: #ffff00;
+            font-family: var(--font-title);
+            color: var(--gold);
             margin-bottom: 20px;
         }
 
@@ -146,39 +209,75 @@
             overflow-y: auto;
         }
 
+        .bank-selector {
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px solid var(--blue-highlight);
+            border-radius: 10px;
+            background: rgba(0, 212, 255, 0.08);
+            text-align: left;
+        }
+
+        .bank-selector h3 {
+            color: var(--blue-highlight);
+            text-align: center;
+            margin: 0 0 12px 0;
+            font-size: 16px;
+        }
+
+        .bank-selector input[type="text"] {
+            background: rgba(0,0,0,0.5);
+            border: 1px solid var(--blue-highlight);
+            border-radius: 6px;
+            padding: 10px;
+            color: white;
+            font-family: var(--font-ui);
+            font-size: 14px;
+            width: 220px;
+            margin-right: 10px;
+        }
+
+        .bank-status {
+            margin-top: 10px;
+            font-size: 12px;
+            color: var(--gold);
+            min-height: 16px;
+        }
+
         .difficulty-selector {
             margin: 30px 0;
             padding: 20px;
-            border: 2px solid #00ffff;
+            border: 2px solid var(--border-purple);
             border-radius: 10px;
-            background: rgba(0, 255, 255, 0.1);
+            background: rgba(106, 5, 114, 0.15);
         }
 
         .difficulty-option {
-            background: rgba(255, 255, 255, 0.1);
-            border: 2px solid #00ffff;
+            background: rgba(255, 255, 255, 0.06);
+            border: 2px solid var(--blue-highlight);
             border-radius: 8px;
             padding: 15px;
             margin: 10px 0;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
             text-align: left;
         }
 
         .difficulty-option:hover {
-            background: rgba(0, 255, 255, 0.2);
+            background: rgba(0, 212, 255, 0.15);
             transform: scale(1.02);
         }
 
         .difficulty-option.selected {
-            background: rgba(0, 255, 255, 0.3);
-            border-color: #ffff00;
+            background: rgba(0, 212, 255, 0.2);
+            border-color: var(--gold);
         }
 
         .difficulty-title {
-            font-weight: bold;
-            color: #00ffff;
+            font-weight: 600;
+            color: var(--blue-highlight);
             margin-bottom: 5px;
+            font-size: 16px;
         }
 
         .difficulty-description {
@@ -190,17 +289,19 @@
             text-align: left;
             margin: 20px 0;
             line-height: 1.6;
+            font-size: 16px;
         }
 
         .instructions h3 {
-            color: #00ffff;
+            color: var(--blue-highlight);
             margin-top: 25px;
             margin-bottom: 10px;
+            font-size: 16px;
         }
 
         .upgrade-item {
-            background: rgba(0, 255, 0, 0.1);
-            border: 2px solid #00ff00;
+            background: rgba(46, 204, 113, 0.08);
+            border: 2px solid var(--green-success);
             border-radius: 8px;
             padding: 15px;
             margin: 10px 0;
@@ -210,8 +311,8 @@
         }
 
         .upgrade-item.cant-afford {
-            background: rgba(255, 0, 0, 0.1);
-            border-color: #ff0000;
+            background: rgba(231, 76, 60, 0.08);
+            border-color: var(--red-damage);
             opacity: 0.6;
         }
 
@@ -220,9 +321,10 @@
         }
 
         .upgrade-name {
-            font-weight: bold;
-            color: #00ff00;
+            font-weight: 600;
+            color: var(--green-success);
             margin-bottom: 5px;
+            font-size: 16px;
         }
 
         .upgrade-description {
@@ -233,41 +335,43 @@
 
         .upgrade-level {
             font-size: 12px;
-            color: #ffff00;
+            color: var(--gold);
         }
 
         .upgrade-buy {
-            background: linear-gradient(45deg, #00ff00, #00cc00);
+            background: linear-gradient(45deg, var(--green-success), #27ae60);
             border: none;
             border-radius: 6px;
             padding: 8px 16px;
             color: white;
-            font-family: 'Courier New', monospace;
+            font-family: var(--font-ui);
+            font-weight: 600;
             font-size: 14px;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
+            margin: 0;
         }
 
         .upgrade-buy:hover:not(:disabled) {
             transform: scale(1.05);
-            box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+            box-shadow: 0 0 10px rgba(46, 204, 113, 0.5);
         }
 
         .upgrade-buy:disabled {
-            background: #666666;
+            background: #555555;
             cursor: not-allowed;
             opacity: 0.5;
         }
 
         .quiz-progress {
-            font-size: 18px;
-            color: #00ffff;
+            font-size: 16px;
+            color: var(--blue-highlight);
             margin-bottom: 15px;
         }
 
         .game-over-upgrade {
-            background: rgba(0, 255, 0, 0.1);
-            border: 2px solid #00ff00;
+            background: rgba(46, 204, 113, 0.08);
+            border: 2px solid var(--green-success);
             border-radius: 8px;
             padding: 20px;
             margin: 20px 0;
@@ -275,8 +379,9 @@
         }
 
         .game-over-upgrade h3 {
-            color: #00ff00;
+            color: var(--green-success);
             margin-bottom: 10px;
+            font-size: 16px;
         }
 
         .game-over-upgrade p {
@@ -286,20 +391,26 @@
         }
 
         .game-over-upgrade button {
-            background: linear-gradient(45deg, #00ff00, #00cc00);
+            background: linear-gradient(45deg, var(--green-success), #27ae60);
+            border-color: #27ae60;
             font-size: 14px;
             padding: 10px 20px;
         }
 
+        .game-over-upgrade button:hover {
+            border-color: var(--green-success);
+            box-shadow: 0 0 15px rgba(46, 204, 113, 0.5);
+        }
+
         .game-over-upgrade button:disabled {
-            background: #666666;
+            background: #555555;
             cursor: not-allowed;
             opacity: 0.5;
         }
 
         .stats-section {
-            background: rgba(0, 100, 200, 0.1);
-            border: 2px solid #0066cc;
+            background: rgba(0, 212, 255, 0.08);
+            border: 2px solid var(--blue-highlight);
             border-radius: 8px;
             padding: 15px;
             margin: 20px 0;
@@ -307,8 +418,9 @@
         }
 
         .stats-section h3 {
-            color: #0066cc;
+            color: var(--blue-highlight);
             margin-bottom: 10px;
+            font-size: 16px;
         }
 
         .stats-section p {
@@ -317,44 +429,34 @@
             font-size: 14px;
         }
     </style>
-  <style>@view-transition { navigation: auto; }</style>
-  <script src="/_sdk/0179d719c431a79e.data_sdk.js" type="text/javascript" integrity="sha512-OsRvJkI5GkC3MJQcgotQYotpzrMSX415GiKKgvYdxQEEkzD/fdchShO2FMSy0PJr/tiINMXOk5Vl2zAgg6bUiA=="></script>
-  <script src="/_sdk/8650958800d6c92a.element_sdk.js" type="text/javascript" integrity="sha512-zFMhEG5W24TdVhhc4yw+K4kKrl6mClLz7Nz7OlZcKY64bZTx26LpVI6mwMCarQMzfrHe8i4fBMu4fxoFej2m9g=="></script>
-  <script src="https://cdn.tailwindcss.com" type="text/javascript"></script>
-  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js" type="text/javascript"></script>
-  <script src="https://cdn.tailwindcss.com/3.4.17" type="text/javascript"></script>
  </head>
  <body>
   <div id="gameContainer">
-   <div class="stars" id="stars"></div>
-   <canvas id="gameCanvas"></canvas>
-   <div id="ui">
-    <div>
-     Wave: <span id="wave">1</span>
-    </div>
-    <div>
-     Lives: <span id="lives">3</span>
-    </div>
-    <div>
-     Score: <span id="score">0</span>
-    </div>
-    <div>
-     High Score: <span id="highScore">0</span>
-    </div>
-    <div>
-     Ammo: <span id="ammo">20</span>
-    </div>
-    <div>
-     Shields: <span id="shields">0</span>
-    </div>
-    <div>
-     Enemies: <span id="enemies">0</span>
-    </div>
+   <div id="canvasFrame">
+    <div class="stars" id="stars"></div>
+    <canvas id="gameCanvas"></canvas>
+   </div>
+   <div id="hud-left">
+    <div class="hud-row">❤️ <span class="hud-value" id="lives">3</span><span class="hud-sub">🛡 <span id="shields">0</span></span></div>
+    <div class="hud-row">⭐ Wave <span class="hud-value" id="wave">1</span><span class="hud-sub">👾 <span id="enemies">0</span></span></div>
+    <div class="hud-row">💀 Kills <span class="hud-value" id="kills">0</span></div>
+   </div>
+   <div id="hud-right">
+    <div class="hud-row">🔫 Ammo <span class="hud-value" id="ammo">20</span></div>
+    <div class="hud-row">⏱ <span class="hud-value" id="elapsedTime">00:00</span></div>
+    <div class="hud-row">⭐ Score <span class="hud-value" id="score">0</span></div>
+    <div class="hud-row">🏆 High <span class="hud-value" id="highScore">0</span></div>
    </div>
    <div id="welcomeScreen" class="modal">
-    <h1 style="color: #00ffff; margin-bottom: 30px;">🚀 SPACE INVADERS: ENERGY &amp; WAVES ⚡</h1>
+    <h1 style="color: var(--blue-highlight); margin-bottom: 30px;">🚀 SPACE INVADERS <span id="subjectTitleInline">ENERGY &amp; WAVES</span> ⚡</h1>
+    <div class="bank-selector">
+     <h3>📚 Question Bank</h3>
+     <p style="font-size: 12px; color: #cccccc; margin: 0 0 12px 0;">Enter the code your teacher gave you to load your subject's quiz. Leave blank to play the default Energy &amp; Waves quiz.</p>
+     <div style="display: flex; align-items: center; flex-wrap: wrap;"><input type="text" id="bankCode" placeholder="Enter code (e.g. 93bf)" maxlength="12"> <button onclick="loadQuestionBank()" style="font-size: 14px; padding: 10px 18px; margin: 0;">Load</button></div>
+     <div class="bank-status" id="bankStatus">Currently loaded: <strong>Energy &amp; Waves</strong> (default)</div>
+    </div>
     <div class="difficulty-selector">
-     <h3 style="color: #00ffff; text-align: center; margin-bottom: 20px;">Choose Difficulty</h3>
+     <h3 style="color: var(--blue-highlight); text-align: center; margin-bottom: 20px;">Choose Difficulty</h3>
      <div class="difficulty-option selected" onclick="selectDifficulty('easy')">
       <div class="difficulty-title">
        🟢 EASY MODE
@@ -375,35 +477,35 @@
     <div class="instructions">
      <h3>🎯 HOW TO PLAY</h3>
      <p><strong>Move:</strong> Arrow Keys or WASD • <strong>Shooting:</strong> Automatic</p>
-     <p><strong>Goal:</strong> Answer Energy &amp; Waves quizzes to get ammo, then fight aliens!</p>
+     <p><strong>Goal:</strong> Answer quiz questions to get ammo, then fight aliens!</p>
      <h3>🌊 GAME FLOW</h3>
      <p>Quiz → Fight Aliens → Quiz → Fight → Shop → Quiz → Boss Fight...</p>
      <p>Every 5th wave: Shop first, then quiz, then boss!</p>
      <h3>🧠 QUIZ SYSTEM</h3>
      <p><strong>Correct answers = +10 Ammo</strong> • No ammo = no shooting!</p>
-     <p style="text-align: center; margin-top: 30px; color: #ffff00;"><strong>Learn about Energy and Waves while defending the planet!</strong></p>
+     <p style="text-align: center; margin-top: 30px; color: var(--gold);"><strong>Learn while defending the planet!</strong></p>
     </div>
     <div style="margin: 30px 0; padding: 20px; border: 2px solid #333; border-radius: 10px; background: rgba(0, 0, 0, 0.3);">
-     <h3 style="color: #666; margin-bottom: 15px; font-size: 14px;">Developer Testing</h3><input type="text" id="secretCode" placeholder="Enter code..." style="background: rgba(0,0,0,0.5); border: 1px solid #666; border-radius: 5px; padding: 8px; color: white; font-family: 'Courier New', monospace; width: 200px; margin-right: 10px;"> <button onclick="processSecretCode()" style="padding: 8px 16px; font-size: 14px;">Apply</button>
-     <div id="codeResult" style="margin-top: 10px; color: #ffff00; font-size: 12px;"></div>
+     <h3 style="color: #888; margin-bottom: 15px; font-size: 12px;">Developer Testing</h3><input type="text" id="secretCode" placeholder="Enter code..." style="background: rgba(0,0,0,0.5); border: 1px solid #666; border-radius: 5px; padding: 8px; color: white; font-family: var(--font-ui); width: 200px; margin-right: 10px;"> <button onclick="processSecretCode()" style="padding: 8px 16px; font-size: 14px;">Apply</button>
+     <div id="codeResult" style="margin-top: 10px; color: var(--gold); font-size: 12px;"></div>
     </div><button onclick="startGame()" style="font-size: 20px; padding: 15px 30px;"> 🚀 BEGIN GAME 🚀 </button>
    </div>
    <div id="quiz" class="modal">
-    <h2 style="color: #ff00ff;">ENERGY &amp; WAVES QUIZ</h2>
+    <h2 style="color: var(--accent-pink);"><span id="quizTitleText">ENERGY &amp; WAVES</span> QUIZ</h2>
     <div class="quiz-progress" id="quizProgress"></div>
     <div class="timer" id="quizTimer">
      15
     </div>
-    <div id="quizQuestion"></div>
+    <div id="quizQuestion" style="font-size: 18px; margin: 15px 0;"></div>
     <div id="quizOptions"></div>
     <div id="quizResult" style="margin-top: 20px;"></div>
    </div>
    <div id="shop" class="modal">
-    <h2 style="color: #00ff00;">🛒 UPGRADE SHOP</h2>
+    <h2 style="color: var(--green-success);">🛒 UPGRADE SHOP</h2>
     <div class="timer" id="shopTimer">
      30
     </div>
-    <div style="margin: 20px 0; color: #ffff00;">
+    <div style="margin: 20px 0; color: var(--gold);">
      <div>
       Current Score: <span id="shopScore">0</span>
      </div>
@@ -416,7 +518,7 @@
     </div><button onclick="closeShop()" style="margin-top: 20px;">Continue to Quiz</button>
    </div>
    <div id="gameOver" class="modal">
-    <h2 style="color: #ff0000;">GAME OVER</h2>
+    <h2 style="color: var(--red-damage);">GAME OVER</h2>
     <div style="margin: 20px 0;">
      <div>
       Final Score: <span id="finalScore">0</span>
@@ -427,7 +529,7 @@
      <div>
       Wave Reached: <span id="finalWave">1</span>
      </div>
-     <div id="newHighScoreMessage" style="color: #ffff00; font-weight: bold; margin-top: 10px; display: none;">
+     <div id="newHighScoreMessage" style="color: var(--gold); font-weight: bold; margin-top: 10px; display: none;">
       🎉 NEW HIGH SCORE! 🎉
      </div>
     </div>
@@ -538,7 +640,7 @@
         };
 
         // Quiz questions - Energy and Waves (30 total)
-        const quizQuestions = [
+        const DEFAULT_QUESTIONS = [
             // ENERGY QUESTIONS (15)
             {
                 question: "What is energy?",
@@ -693,6 +795,85 @@
                 correct: 2
             }
         ];
+
+        // The currently active set of quiz questions (defaults to the built-in bank).
+        // Loaded question banks from questions/{code}.json replace this array.
+        let quizQuestions = DEFAULT_QUESTIONS;
+        let currentSubjectName = 'Energy & Waves';
+
+        // Question bank loading system
+        // Teachers/students enter a code on the title screen (e.g. "93bf").
+        // The game fetches questions/{code}.json - a self-contained subject file
+        // shaped like: { "subject": "Biology", "questions": [ { "question": "...", "options": [...], "correct": 0 }, ... ] }
+        // Adding a new subject is just dropping a new JSON file in questions/ - no code changes needed.
+        function validateQuestionBank(data) {
+            if (!data || !Array.isArray(data.questions) || data.questions.length === 0) return false;
+            return data.questions.every(q =>
+                typeof q.question === 'string' &&
+                Array.isArray(q.options) && q.options.length >= 2 &&
+                Number.isInteger(q.correct) && q.correct >= 0 && q.correct < q.options.length
+            );
+        }
+
+        function setActiveSubject(name) {
+            currentSubjectName = name;
+            const subjectTitle = document.getElementById('subjectTitleInline');
+            const quizTitle = document.getElementById('quizTitleText');
+            if (subjectTitle) subjectTitle.textContent = name.toUpperCase();
+            if (quizTitle) quizTitle.textContent = name.toUpperCase();
+        }
+
+        async function loadQuestionBank() {
+            const codeInput = document.getElementById('bankCode');
+            const statusDiv = document.getElementById('bankStatus');
+            const code = codeInput.value.trim().toLowerCase();
+
+            if (code === '') {
+                quizQuestions = DEFAULT_QUESTIONS;
+                setActiveSubject('Energy & Waves');
+                statusDiv.innerHTML = 'Currently loaded: <strong>Energy &amp; Waves</strong> (default)';
+                statusDiv.style.color = 'var(--gold)';
+                localStorage.removeItem('lastBankCode');
+                return;
+            }
+
+            statusDiv.textContent = 'Loading...';
+            statusDiv.style.color = 'var(--blue-highlight)';
+
+            try {
+                const response = await fetch(`questions/${encodeURIComponent(code)}.json`);
+                if (!response.ok) throw new Error('not found');
+                const data = await response.json();
+
+                if (!validateQuestionBank(data)) {
+                    throw new Error('invalid format');
+                }
+
+                quizQuestions = data.questions;
+                const subjectName = data.subject || code.toUpperCase();
+                setActiveSubject(subjectName);
+                statusDiv.innerHTML = `✅ Loaded: <strong>${subjectName}</strong> (${data.questions.length} questions)`;
+                statusDiv.style.color = 'var(--green-success)';
+                localStorage.setItem('lastBankCode', code);
+            } catch (err) {
+                quizQuestions = DEFAULT_QUESTIONS;
+                setActiveSubject('Energy & Waves');
+                statusDiv.innerHTML = `❌ Code "${code}" not found — using default Energy &amp; Waves questions`;
+                statusDiv.style.color = 'var(--red-damage)';
+            }
+        }
+
+        // Re-load whichever bank code was used last time, for convenience
+        window.addEventListener('load', () => {
+            const savedCode = localStorage.getItem('lastBankCode');
+            if (savedCode) {
+                const input = document.getElementById('bankCode');
+                if (input) {
+                    input.value = savedCode;
+                    loadQuestionBank();
+                }
+            }
+        });
 
         // Game classes
         class Player {
@@ -2610,15 +2791,15 @@
             });
             
             if (isCorrect) {
-                options[optionIndex].style.backgroundColor = 'rgba(0, 255, 0, 0.3)';
-                options[optionIndex].style.borderColor = '#00ff00';
+                options[optionIndex].style.backgroundColor = 'rgba(46, 204, 113, 0.3)';
+                options[optionIndex].style.borderColor = 'var(--green-success)';
             } else {
                 if (optionIndex >= 0) {
-                    options[optionIndex].style.backgroundColor = 'rgba(255, 0, 0, 0.3)';
-                    options[optionIndex].style.borderColor = '#ff0000';
+                    options[optionIndex].style.backgroundColor = 'rgba(231, 76, 60, 0.3)';
+                    options[optionIndex].style.borderColor = 'var(--red-damage)';
                 }
-                options[question.correct].style.backgroundColor = 'rgba(0, 255, 0, 0.3)';
-                options[question.correct].style.borderColor = '#00ff00';
+                options[question.correct].style.backgroundColor = 'rgba(46, 204, 113, 0.3)';
+                options[question.correct].style.borderColor = 'var(--green-success)';
             }
             
             if (isCorrect) {
@@ -2738,11 +2919,11 @@
                 waveInput.min = '1';
                 waveInput.max = '50';
                 waveInput.value = '1';
-                waveInput.style.cssText = 'background: rgba(0,0,0,0.5); border: 1px solid #666; border-radius: 5px; padding: 8px; color: white; font-family: "Courier New", monospace; width: 200px; margin-right: 10px;';
+                waveInput.style.cssText = 'background: rgba(0,0,0,0.5); border: 1px solid #666; border-radius: 5px; padding: 8px; color: white; font-family: "Lexend", sans-serif; width: 200px; margin-right: 10px;';
                 
                 const applyBtn = document.createElement('button');
                 applyBtn.textContent = 'Set';
-                applyBtn.style.cssText = 'padding: 8px 16px; font-size: 14px; background: linear-gradient(45deg, #00ff00, #00cc00); border: none; border-radius: 4px; color: white; cursor: pointer;';
+                applyBtn.style.cssText = 'padding: 8px 16px; font-size: 14px; background: linear-gradient(45deg, #2ecc71, #27ae60); border: none; border-radius: 4px; color: white; cursor: pointer;';
                 applyBtn.onclick = () => {
                     const wave = parseInt(waveInput.value);
                     if (wave >= 1 && wave <= 50) {
@@ -2815,6 +2996,10 @@
             game.skipQuizzes = false;
             game.powerupTestMode = false;
             
+            game.matchStartTime = null;
+            const elapsedEl = document.getElementById('elapsedTime');
+            if (elapsedEl) elapsedEl.textContent = '00:00';
+            
             hideAllModals();
             document.getElementById('welcomeScreen').style.display = 'block';
             game.state = GameState.WELCOME;
@@ -2825,10 +3010,12 @@
             game.canvas = document.getElementById('gameCanvas');
             game.ctx = game.canvas.getContext('2d');
             
-            game.width = window.innerWidth;
-            game.height = window.innerHeight;
+            game.width = 800;
+            game.height = 600;
             game.canvas.width = game.width;
             game.canvas.height = game.height;
+            resizeCanvasFrame();
+            game.matchStartTime = Date.now();
             
             game.highScore = parseInt(localStorage.getItem('spaceInvadersHighScore') || '0');
             
@@ -3103,6 +3290,12 @@
             }
             requestAnimationFrame(gameLoop);
         }
+
+        setInterval(() => {
+            if (game.state !== GameState.WELCOME && game.state !== GameState.GAME_OVER) {
+                updateElapsedTime();
+            }
+        }, 1000);
 
         function update() {
             game.player.update();
@@ -3532,6 +3725,16 @@
             document.getElementById('ammo').textContent = game.ammo;
             document.getElementById('shields').textContent = game.shields;
             document.getElementById('enemies').textContent = game.enemies.length;
+            document.getElementById('kills').textContent = game.enemiesDefeatedThisRun;
+        }
+
+        function updateElapsedTime() {
+            if (!game.matchStartTime) return;
+            const totalSeconds = Math.floor((Date.now() - game.matchStartTime) / 1000);
+            const mins = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+            const secs = (totalSeconds % 60).toString().padStart(2, '0');
+            const el = document.getElementById('elapsedTime');
+            if (el) el.textContent = `${mins}:${secs}`;
         }
 
         function gameOver() {
@@ -3578,16 +3781,23 @@
         let targetX = null;
         let isPointerActive = false;
 
+        function screenToCanvasX(clientX) {
+            if (!game.canvas) return clientX;
+            const rect = game.canvas.getBoundingClientRect();
+            const scaleX = game.canvas.width / rect.width;
+            return (clientX - rect.left) * scaleX;
+        }
+
         function handlePointerStart(clientX, clientY) {
             if (game.state === GameState.PLAYING) {
-                targetX = clientX;
+                targetX = screenToCanvasX(clientX);
                 isPointerActive = true;
             }
         }
 
         function handlePointerMove(clientX, clientY) {
             if (game.state === GameState.PLAYING && isPointerActive) {
-                targetX = clientX;
+                targetX = screenToCanvasX(clientX);
             }
         }
 
@@ -3640,16 +3850,17 @@
             }
         });
 
-        window.addEventListener('resize', () => {
-            if (game.canvas) {
-                game.width = window.innerWidth;
-                game.height = window.innerHeight;
-                game.canvas.width = game.width;
-                game.canvas.height = game.height;
-            }
-        });
+        function resizeCanvasFrame() {
+            const frame = document.getElementById('canvasFrame');
+            if (!frame) return;
+            const scale = Math.min(window.innerWidth / 800, window.innerHeight / 600);
+            frame.style.transform = `scale(${scale})`;
+        }
+
+        window.addEventListener('resize', resizeCanvasFrame);
 
         window.addEventListener('load', () => {
+            resizeCanvasFrame();
             createStars();
         });
     </script>

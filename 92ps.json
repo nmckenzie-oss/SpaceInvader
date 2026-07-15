@@ -1,0 +1,85 @@
+{
+  "subject": "Physics",
+  "questions": [
+    {
+      "question": "What is the SI unit of force?",
+      "options": ["Joule", "Newton", "Watt", "Pascal"],
+      "correct": 1
+    },
+    {
+      "question": "What does Newton's First Law describe?",
+      "options": ["Action and reaction", "Force equals mass times acceleration", "An object stays at rest or in motion unless acted on by a force", "Gravity between two masses"],
+      "correct": 2
+    },
+    {
+      "question": "What is the formula for force?",
+      "options": ["F = m/a", "F = ma", "F = m + a", "F = a/m"],
+      "correct": 1
+    },
+    {
+      "question": "What type of energy does a moving object have?",
+      "options": ["Potential energy", "Kinetic energy", "Chemical energy", "Nuclear energy"],
+      "correct": 1
+    },
+    {
+      "question": "What is the speed of light in a vacuum, approximately?",
+      "options": ["300,000 km/s", "150,000 km/s", "3,000 km/s", "30,000 km/s"],
+      "correct": 0
+    },
+    {
+      "question": "Which of these is a vector quantity?",
+      "options": ["Speed", "Mass", "Velocity", "Time"],
+      "correct": 2
+    },
+    {
+      "question": "What is the unit of electrical resistance?",
+      "options": ["Volt", "Ampere", "Ohm", "Watt"],
+      "correct": 2
+    },
+    {
+      "question": "What happens to the frequency of a wave as its wavelength increases (speed constant)?",
+      "options": ["It increases", "It decreases", "It stays the same", "It becomes zero"],
+      "correct": 1
+    },
+    {
+      "question": "What force pulls objects toward the center of the Earth?",
+      "options": ["Magnetism", "Friction", "Gravity", "Tension"],
+      "correct": 2
+    },
+    {
+      "question": "What is the term for the resistance of an object to a change in its motion?",
+      "options": ["Momentum", "Inertia", "Velocity", "Acceleration"],
+      "correct": 1
+    },
+    {
+      "question": "Which law states that energy cannot be created or destroyed?",
+      "options": ["Newton's Third Law", "Law of Conservation of Energy", "Ohm's Law", "Law of Reflection"],
+      "correct": 1
+    },
+    {
+      "question": "What is the unit used to measure electrical current?",
+      "options": ["Volt", "Ampere", "Ohm", "Joule"],
+      "correct": 1
+    },
+    {
+      "question": "What type of circuit has only one path for current to flow?",
+      "options": ["Parallel circuit", "Series circuit", "Open circuit", "Short circuit"],
+      "correct": 1
+    },
+    {
+      "question": "What is the acceleration due to gravity on Earth, approximately?",
+      "options": ["5 m/s²", "9.8 m/s²", "15 m/s²", "20 m/s²"],
+      "correct": 1
+    },
+    {
+      "question": "Which of Newton's laws explains why a rocket moves forward as gas is pushed out the back?",
+      "options": ["First Law", "Second Law", "Third Law", "Law of Gravitation"],
+      "correct": 2
+    },
+    {
+      "question": "What is the term for the bending of light as it passes between materials?",
+      "options": ["Reflection", "Refraction", "Diffraction", "Absorption"],
+      "correct": 1
+    }
+  ]
+}
