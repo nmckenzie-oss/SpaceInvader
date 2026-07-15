@@ -1,28 +1,34 @@
 # Adding a question bank
 
-You never need to touch the game's code to add a new subject — just drop a JSON file in this `questions/` folder.
+A valid question bank code is **required** to play — there's no default quiz anymore. The **Begin Game** button stays disabled until a valid code is loaded.
 
-## How it works
+Students and teachers enter a code into the single code box on the title screen and hit **Apply**. That box is used for two things:
 
-On the title screen, students/teachers type a code (e.g. `93bf`) into the **Question Bank** box and hit **Load**. The game fetches a file called `questions/<code>.json`. Whatever's in that file becomes the quiz.
+1. **Question bank codes** (e.g. `93bf`) — loads a subject's quiz questions and unlocks Begin Game.
+2. **Developer testing codes** (`wave`, `alien`, `powerup`) — shortcuts for testing the game (see below). These do NOT unlock Begin Game on their own — a real question bank code still needs to be loaded too.
 
-If nothing is entered, the game uses its built-in default bank (Energy & Waves).
+Whatever's typed in is checked against the testing codes first; if it's not one of those, it's looked up as a question bank code.
 
-## File naming
+## How question bank codes work
 
-Name the file exactly after the code you want people to type, in lowercase, e.g.:
+Near the top of the `<script>` in `index.html` there's a lookup table:
 
-- Code `93bf` → `questions/93bf.json`
-- Code `92ps` → `questions/92ps.json`
-- Code `chem1` → `questions/chem1.json`
+```js
+const QUESTION_BANK_FILES = {
+    '93bf': 'question-banks/93bf.json',
+    '92ps': 'question-banks/92ps.json',
+};
+```
 
-Two examples are already included:
-- `93bf.json` — Biology
-- `92ps.json` — Physics
+To add a new subject:
 
-## File format
+1. Create a new JSON file in the `question-banks/` folder (copy `93bf.json` as a starting template).
+2. Add one line to `QUESTION_BANK_FILES` mapping your chosen code to that file's path.
+3. Give students the code.
 
-Each file needs this shape:
+This is the only code change ever needed — you're not touching any game logic, just adding a line to this table.
+
+## JSON file format
 
 ```json
 {
@@ -32,30 +38,38 @@ Each file needs this shape:
       "question": "What is the chemical symbol for water?",
       "options": ["H2O", "CO2", "O2", "NaCl"],
       "correct": 0
-    },
-    {
-      "question": "...",
-      "options": ["...", "...", "...", "..."],
-      "correct": 2
     }
   ]
 }
 ```
 
-Rules:
-- `subject` is shown on-screen (title, quiz heading) — use whatever name you like.
+- `subject` is shown on-screen (title, quiz heading).
 - Each question needs at least 2 `options` (4 is typical).
-- `correct` is the **index** of the right answer in the `options` array, counting from 0. So if the right answer is the first option, `correct` is `0`; if it's the third, `correct` is `2`.
-- Include as many questions as you like — more means less repetition. 15-30 is a good range.
+- `correct` is the **index** of the right answer, counting from 0.
+- 15-30 questions is a good range so quizzes don't repeat too often.
 
-## Important: hosting requirement
+## Developer testing codes
 
-Because the game fetches these files over the network, it must be **served from a web server** (a school website, GitHub Pages, Google Sites, etc.) — not opened directly as a local file (double-clicking `index.html`). If a code fails to load, the game will show an error and fall back to the default questions automatically, so students are never stuck.
+Typed into the same code box:
 
-## Quick checklist for adding a subject
+| Code | Effect |
+|---|---|
+| `wave` | Shows a number picker to jump straight to a chosen wave (1-50), with 200 ammo |
+| `alien` | Skips quizzes entirely, starts with 500 ammo |
+| `powerup` | Skips quizzes, starts with 2000 ammo, and spawns a powerup every wave |
 
-1. Copy `93bf.json` as a starting template.
-2. Rename it to `<yourcode>.json`.
-3. Replace `subject` and `questions` with your content.
-4. Upload it into the same `questions/` folder as `index.html`.
-5. Give students the code. Done — no code changes required.
+These don't touch the question bank — they're just gameplay shortcuts for testing.
+
+## Hosting requirement
+
+Because question bank files are fetched over the network, the game needs to be **served from a web server** (school website, GitHub Pages, etc.) — not opened directly by double-clicking `index.html`. If a code can't be loaded, the game shows an error explaining this, since there's no default fallback quiz anymore.
+
+## Troubleshooting: "Couldn't load code" error
+
+This almost always means `fetch()` is failing, which happens when:
+
+- **The page was opened as a local file** (`file:///...`) instead of served over http(s). Browsers block JavaScript from reading local files for security reasons — this is the most common cause. Fix: host the folder on GitHub Pages, a school website, or run a simple local server (e.g. `python3 -m http.server` from the folder, then visit `http://localhost:8000`).
+- **The `question-banks/` folder wasn't uploaded** alongside `index.html`, or was renamed. The folder must sit next to `index.html`, not inside a different directory.
+- **The code isn't in `QUESTION_BANK_FILES`** in `index.html`, or is misspelled.
+
+Open the browser's developer console (F12 → Console tab) for the exact error — it's logged there even though the on-screen message stays generic.

@@ -176,6 +176,15 @@
             box-shadow: 0 0 15px rgba(233, 69, 96, 0.6);
         }
 
+        button:disabled,
+        button:disabled:hover {
+            transform: none;
+            border-color: #555;
+            background: #333;
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+
         .timer {
             font-size: 24px;
             font-family: var(--font-title);
@@ -448,12 +457,13 @@
     <div class="hud-row">🏆 High <span class="hud-value" id="highScore">0</span></div>
    </div>
    <div id="welcomeScreen" class="modal">
-    <h1 style="color: var(--blue-highlight); margin-bottom: 30px;">🚀 SPACE INVADERS <span id="subjectTitleInline">ENERGY &amp; WAVES</span> ⚡</h1>
+    <h1 style="color: var(--blue-highlight); margin-bottom: 30px;">🚀 SPACE INVADERS <span id="subjectTitleInline"></span> ⚡</h1>
     <div class="bank-selector">
-     <h3>📚 Question Bank</h3>
-     <p style="font-size: 12px; color: #cccccc; margin: 0 0 12px 0;">Enter the code your teacher gave you to load your subject's quiz. Leave blank to play the default Energy &amp; Waves quiz.</p>
-     <div style="display: flex; align-items: center; flex-wrap: wrap;"><input type="text" id="bankCode" placeholder="Enter code (e.g. 93bf)" maxlength="12"> <button onclick="loadQuestionBank()" style="font-size: 14px; padding: 10px 18px; margin: 0;">Load</button></div>
-     <div class="bank-status" id="bankStatus">Currently loaded: <strong>Energy &amp; Waves</strong> (default)</div>
+     <h3>📚 Enter Code</h3>
+     <p style="font-size: 12px; color: #cccccc; margin: 0 0 12px 0;">Enter the code your teacher gave you to load your subject's quiz, then hit Apply. A question bank is required to play.</p>
+     <div style="display: flex; align-items: center; flex-wrap: wrap;"><input type="text" id="bankCode" placeholder="Enter code (e.g. 93bf)" maxlength="16"> <button onclick="applyCode()" style="font-size: 14px; padding: 10px 18px; margin: 0;">Apply</button></div>
+     <div class="bank-status" id="bankStatus" style="color: var(--red-damage);">No question bank loaded — enter a code to play</div>
+     <div id="bankExtra" style="margin-top: 10px; font-size: 12px;"></div>
     </div>
     <div class="difficulty-selector">
      <h3 style="color: var(--blue-highlight); text-align: center; margin-bottom: 20px;">Choose Difficulty</h3>
@@ -484,14 +494,10 @@
      <h3>🧠 QUIZ SYSTEM</h3>
      <p><strong>Correct answers = +10 Ammo</strong> • No ammo = no shooting!</p>
      <p style="text-align: center; margin-top: 30px; color: var(--gold);"><strong>Learn while defending the planet!</strong></p>
-    </div>
-    <div style="margin: 30px 0; padding: 20px; border: 2px solid #333; border-radius: 10px; background: rgba(0, 0, 0, 0.3);">
-     <h3 style="color: #888; margin-bottom: 15px; font-size: 12px;">Developer Testing</h3><input type="text" id="secretCode" placeholder="Enter code..." style="background: rgba(0,0,0,0.5); border: 1px solid #666; border-radius: 5px; padding: 8px; color: white; font-family: var(--font-ui); width: 200px; margin-right: 10px;"> <button onclick="processSecretCode()" style="padding: 8px 16px; font-size: 14px;">Apply</button>
-     <div id="codeResult" style="margin-top: 10px; color: var(--gold); font-size: 12px;"></div>
-    </div><button onclick="startGame()" style="font-size: 20px; padding: 15px 30px;"> 🚀 BEGIN GAME 🚀 </button>
+    </div><button id="beginGameBtn" onclick="startGame()" disabled style="font-size: 20px; padding: 15px 30px; opacity: 0.5; cursor: not-allowed;"> 🚀 BEGIN GAME 🚀 </button>
    </div>
    <div id="quiz" class="modal">
-    <h2 style="color: var(--accent-pink);"><span id="quizTitleText">ENERGY &amp; WAVES</span> QUIZ</h2>
+    <h2 style="color: var(--accent-pink);"><span id="quizTitleText"></span> QUIZ</h2>
     <div class="quiz-progress" id="quizProgress"></div>
     <div class="timer" id="quizTimer">
      15
@@ -639,173 +645,22 @@
             powerupTestMode: false
         };
 
-        // Quiz questions - Energy and Waves (30 total)
-        const DEFAULT_QUESTIONS = [
-            // ENERGY QUESTIONS (15)
-            {
-                question: "What is energy?",
-                options: ["The ability to do work or cause change", "A type of matter", "A chemical reaction", "A physical force"],
-                correct: 0
-            },
-            {
-                question: "Which of these is a form of kinetic energy?",
-                options: ["A book on a shelf", "A moving car", "A stretched rubber band", "Food in your stomach"],
-                correct: 1
-            },
-            {
-                question: "What type of energy does a battery store?",
-                options: ["Kinetic energy", "Heat energy", "Chemical energy", "Light energy"],
-                correct: 2
-            },
-            {
-                question: "When you lift a box onto a table, what type of energy does it gain?",
-                options: ["Kinetic energy", "Gravitational potential energy", "Chemical energy", "Sound energy"],
-                correct: 1
-            },
-            {
-                question: "What happens to energy according to the Law of Conservation of Energy?",
-                options: ["It can be created from nothing", "It can be destroyed completely", "It can only be transformed from one form to another", "It always increases over time"],
-                correct: 2
-            },
-            {
-                question: "Which energy transformation occurs in a solar panel?",
-                options: ["Chemical to electrical", "Light to electrical", "Heat to mechanical", "Sound to light"],
-                correct: 1
-            },
-            {
-                question: "What type of energy is stored in food?",
-                options: ["Mechanical energy", "Electrical energy", "Chemical energy", "Nuclear energy"],
-                correct: 2
-            },
-            {
-                question: "When you rub your hands together, kinetic energy is converted to:",
-                options: ["Light energy", "Sound energy", "Heat energy", "Chemical energy"],
-                correct: 2
-            },
-            {
-                question: "What type of energy does a wind turbine convert to electricity?",
-                options: ["Heat energy", "Chemical energy", "Kinetic energy", "Nuclear energy"],
-                correct: 2
-            },
-            {
-                question: "Which of these has the most gravitational potential energy?",
-                options: ["A ball on the ground", "A ball 1 meter high", "A ball 5 meters high", "A ball moving horizontally"],
-                correct: 2
-            },
-            {
-                question: "What energy transformation occurs when you burn wood?",
-                options: ["Chemical to heat and light", "Kinetic to potential", "Electrical to mechanical", "Nuclear to chemical"],
-                correct: 0
-            },
-            {
-                question: "The energy of motion is called:",
-                options: ["Potential energy", "Kinetic energy", "Chemical energy", "Thermal energy"],
-                correct: 1
-            },
-            {
-                question: "What type of energy is released during nuclear reactions?",
-                options: ["Chemical energy", "Mechanical energy", "Nuclear energy", "Magnetic energy"],
-                correct: 2
-            },
-            {
-                question: "When a pendulum swings, energy constantly changes between:",
-                options: ["Kinetic and potential", "Chemical and electrical", "Heat and light", "Sound and mechanical"],
-                correct: 0
-            },
-            {
-                question: "What is the main source of energy for most life on Earth?",
-                options: ["Wind", "The Sun", "Fossil fuels", "Nuclear power"],
-                correct: 1
-            },
-            
-            // WAVES QUESTIONS (15)
-            {
-                question: "What is a wave?",
-                options: ["A type of matter", "A disturbance that transfers energy through space", "A chemical reaction", "A magnetic field"],
-                correct: 1
-            },
-            {
-                question: "Which of these is NOT a type of wave?",
-                options: ["Sound waves", "Light waves", "Water waves", "Gravity waves"],
-                correct: 3
-            },
-            {
-                question: "What is the highest point of a wave called?",
-                options: ["Trough", "Crest", "Amplitude", "Wavelength"],
-                correct: 1
-            },
-            {
-                question: "What is the lowest point of a wave called?",
-                options: ["Crest", "Amplitude", "Trough", "Frequency"],
-                correct: 2
-            },
-            {
-                question: "The distance between two consecutive crests is called:",
-                options: ["Amplitude", "Frequency", "Wavelength", "Period"],
-                correct: 2
-            },
-            {
-                question: "What does the amplitude of a wave measure?",
-                options: ["How fast the wave travels", "How often the wave repeats", "The height or intensity of the wave", "The length of the wave"],
-                correct: 2
-            },
-            {
-                question: "Sound waves travel fastest through:",
-                options: ["Air", "Water", "Solids like steel", "Vacuum"],
-                correct: 2
-            },
-            {
-                question: "Light waves can travel through:",
-                options: ["Only air", "Only water", "Only solids", "Empty space (vacuum)"],
-                correct: 3
-            },
-            {
-                question: "What determines the pitch of a sound wave?",
-                options: ["Amplitude", "Frequency", "Wavelength", "Speed"],
-                correct: 1
-            },
-            {
-                question: "What determines the loudness of a sound wave?",
-                options: ["Frequency", "Wavelength", "Amplitude", "Speed"],
-                correct: 2
-            },
-            {
-                question: "When waves bounce off a surface, this is called:",
-                options: ["Refraction", "Diffraction", "Reflection", "Absorption"],
-                correct: 2
-            },
-            {
-                question: "When waves bend as they pass from one medium to another, this is called:",
-                options: ["Reflection", "Refraction", "Diffraction", "Interference"],
-                correct: 1
-            },
-            {
-                question: "The electromagnetic spectrum includes all of these EXCEPT:",
-                options: ["Radio waves", "X-rays", "Sound waves", "Visible light"],
-                correct: 2
-            },
-            {
-                question: "Which color of visible light has the longest wavelength?",
-                options: ["Red", "Blue", "Green", "Violet"],
-                correct: 0
-            },
-            {
-                question: "What happens when two waves meet and combine?",
-                options: ["Reflection", "Refraction", "Interference", "Absorption"],
-                correct: 2
-            }
-        ];
 
-        // The currently active set of quiz questions (defaults to the built-in bank).
-        // Loaded question banks from questions/{code}.json replace this array.
-        let quizQuestions = DEFAULT_QUESTIONS;
-        let currentSubjectName = 'Energy & Waves';
+        // The currently active set of quiz questions. A valid code MUST be loaded
+        // before the game can start - there is no built-in default question bank.
+        let quizQuestions = null;
+        let currentSubjectName = null;
 
-        // Question bank loading system
-        // Teachers/students enter a code on the title screen (e.g. "93bf").
-        // The game fetches questions/{code}.json - a self-contained subject file
-        // shaped like: { "subject": "Biology", "questions": [ { "question": "...", "options": [...], "correct": 0 }, ... ] }
-        // Adding a new subject is just dropping a new JSON file in questions/ - no code changes needed.
+        // Teacher setup: secret session codes mapped to separate JSON files.
+        // Add a line here (and drop the matching JSON file in the question-banks folder)
+        // to add a new subject - no other code changes needed.
+        // Suggested naming: '<year><term><subject initial><extra letter>'
+        // e.g. Year 9 Biology Term 3 full = '93bf', Year 9 Physics Speed = '92ps'.
+        const QUESTION_BANK_FILES = {
+            '93bf': 'question-banks/93bf.json',
+            '92ps': 'question-banks/92ps.json',
+        };
+
         function validateQuestionBank(data) {
             if (!data || !Array.isArray(data.questions) || data.questions.length === 0) return false;
             return data.questions.every(q =>
@@ -819,34 +674,54 @@
             currentSubjectName = name;
             const subjectTitle = document.getElementById('subjectTitleInline');
             const quizTitle = document.getElementById('quizTitleText');
-            if (subjectTitle) subjectTitle.textContent = name.toUpperCase();
-            if (quizTitle) quizTitle.textContent = name.toUpperCase();
+            if (subjectTitle) subjectTitle.textContent = name ? name.toUpperCase() : '';
+            if (quizTitle) quizTitle.textContent = name ? name.toUpperCase() : '';
+            updateBeginButtonState();
         }
 
-        async function loadQuestionBank() {
-            const codeInput = document.getElementById('bankCode');
+        function updateBeginButtonState() {
+            const beginBtn = document.getElementById('beginGameBtn');
+            if (!beginBtn) return;
+            beginBtn.disabled = !quizQuestions;
+            beginBtn.style.opacity = quizQuestions ? '1' : '0.5';
+            beginBtn.style.cursor = quizQuestions ? 'pointer' : 'not-allowed';
+        }
+
+        // Loads a question bank by code. Called from the single code box on the
+        // title screen (see applyCode() below), and also on page load to restore
+        // whichever bank was last used. A question bank is REQUIRED to play -
+        // there's no default fallback, so Begin Game stays disabled until one loads.
+        async function loadQuestionBank(code) {
             const statusDiv = document.getElementById('bankStatus');
-            const code = codeInput.value.trim().toLowerCase();
 
             if (code === '') {
-                quizQuestions = DEFAULT_QUESTIONS;
-                setActiveSubject('Energy & Waves');
-                statusDiv.innerHTML = 'Currently loaded: <strong>Energy &amp; Waves</strong> (default)';
-                statusDiv.style.color = 'var(--gold)';
+                quizQuestions = null;
+                setActiveSubject(null);
+                statusDiv.innerHTML = 'No question bank loaded — enter a code to play';
+                statusDiv.style.color = 'var(--red-damage)';
                 localStorage.removeItem('lastBankCode');
-                return;
+                return false;
+            }
+
+            const file = QUESTION_BANK_FILES[code];
+            if (!file) {
+                quizQuestions = null;
+                setActiveSubject(null);
+                statusDiv.innerHTML = `❌ Code "${code}" not recognized — enter a valid code to play`;
+                statusDiv.style.color = 'var(--red-damage)';
+                return false;
             }
 
             statusDiv.textContent = 'Loading...';
             statusDiv.style.color = 'var(--blue-highlight)';
 
             try {
-                const response = await fetch(`questions/${encodeURIComponent(code)}.json`);
-                if (!response.ok) throw new Error('not found');
+                const response = await fetch(file);
+                if (!response.ok) throw new Error(`fetch failed with status ${response.status}`);
                 const data = await response.json();
 
                 if (!validateQuestionBank(data)) {
-                    throw new Error('invalid format');
+                    throw new Error('question bank JSON failed validation');
                 }
 
                 quizQuestions = data.questions;
@@ -855,11 +730,14 @@
                 statusDiv.innerHTML = `✅ Loaded: <strong>${subjectName}</strong> (${data.questions.length} questions)`;
                 statusDiv.style.color = 'var(--green-success)';
                 localStorage.setItem('lastBankCode', code);
+                return true;
             } catch (err) {
-                quizQuestions = DEFAULT_QUESTIONS;
-                setActiveSubject('Energy & Waves');
-                statusDiv.innerHTML = `❌ Code "${code}" not found — using default Energy &amp; Waves questions`;
+                console.error('Question bank load failed:', err);
+                quizQuestions = null;
+                setActiveSubject(null);
+                statusDiv.innerHTML = `❌ Couldn't load code "${code}" — enter a valid code to play. (If you're testing locally, this game must be served from a web server, not opened as a local file.)`;
                 statusDiv.style.color = 'var(--red-damage)';
+                return false;
             }
         }
 
@@ -870,7 +748,7 @@
                 const input = document.getElementById('bankCode');
                 if (input) {
                     input.value = savedCode;
-                    loadQuestionBank();
+                    loadQuestionBank(savedCode);
                 }
             }
         });
@@ -2773,6 +2651,14 @@
         }
 
         function startGame() {
+            if (!quizQuestions || quizQuestions.length === 0) {
+                const statusDiv = document.getElementById('bankStatus');
+                if (statusDiv) {
+                    statusDiv.innerHTML = '❌ Enter a valid question bank code before starting';
+                    statusDiv.style.color = 'var(--red-damage)';
+                }
+                return;
+            }
             hideAllModals();
             initializeGame();
             startQuiz();
@@ -2909,52 +2795,72 @@
             startQuiz();
         }
 
-        function processSecretCode() {
-            const code = document.getElementById('secretCode').value.toLowerCase().trim();
-            const resultDiv = document.getElementById('codeResult');
-            
+        // Developer/testing shortcuts - typed into the SAME code box as question bank codes.
+        const DEV_CODES = ['wave', 'alien', 'powerup'];
+
+        function applyDevCode(code) {
+            const statusDiv = document.getElementById('bankStatus');
+            const extraDiv = document.getElementById('bankExtra');
+            extraDiv.innerHTML = '';
+
             if (code === 'wave') {
+                statusDiv.innerHTML = '🛠️ Dev mode: choose a starting wave';
+                statusDiv.style.color = 'var(--gold)';
+
                 const waveInput = document.createElement('input');
                 waveInput.type = 'number';
                 waveInput.min = '1';
                 waveInput.max = '50';
                 waveInput.value = '1';
-                waveInput.style.cssText = 'background: rgba(0,0,0,0.5); border: 1px solid #666; border-radius: 5px; padding: 8px; color: white; font-family: "Lexend", sans-serif; width: 200px; margin-right: 10px;';
-                
+                waveInput.style.cssText = 'background: rgba(0,0,0,0.5); border: 1px solid #666; border-radius: 5px; padding: 8px; color: white; font-family: "Lexend", sans-serif; width: 120px; margin-right: 10px;';
+
                 const applyBtn = document.createElement('button');
                 applyBtn.textContent = 'Set';
-                applyBtn.style.cssText = 'padding: 8px 16px; font-size: 14px; background: linear-gradient(45deg, #2ecc71, #27ae60); border: none; border-radius: 4px; color: white; cursor: pointer;';
+                applyBtn.style.cssText = 'padding: 8px 16px; font-size: 14px; background: linear-gradient(45deg, #2ecc71, #27ae60); border: none; border-radius: 4px; color: white; cursor: pointer; margin: 0;';
                 applyBtn.onclick = () => {
                     const wave = parseInt(waveInput.value);
                     if (wave >= 1 && wave <= 50) {
                         game.startingWave = wave;
                         game.startingAmmo = 200;
                         game.secretCodeActive = true;
-                        resultDiv.innerHTML = `✅ Starting wave set to ${wave} with 200 ammo!`;
+                        extraDiv.innerHTML = `✅ Starting wave set to ${wave} with 200 ammo! Click Begin Game to play.`;
                     } else {
-                        resultDiv.innerHTML = '❌ Wave must be between 1-50';
+                        extraDiv.innerHTML = '❌ Wave must be between 1-50';
                     }
                 };
-                
-                resultDiv.innerHTML = 'Select starting wave: ';
-                resultDiv.appendChild(waveInput);
-                resultDiv.appendChild(applyBtn);
+
+                extraDiv.appendChild(waveInput);
+                extraDiv.appendChild(applyBtn);
             } else if (code === 'alien') {
                 game.skipQuizzes = true;
                 game.startingAmmo = 500;
                 game.secretCodeActive = true;
-                resultDiv.innerHTML = '✅ Quiz skip mode activated! Starting with 500 ammo!';
+                statusDiv.innerHTML = '✅ Quiz skip mode activated! Starting with 500 ammo!';
+                statusDiv.style.color = 'var(--green-success)';
             } else if (code === 'powerup') {
                 game.skipQuizzes = true;
                 game.startingAmmo = 2000;
                 game.secretCodeActive = true;
                 game.powerupTestMode = true;
-                resultDiv.innerHTML = '✅ Powerup testing mode! 2000 ammo, quizzes skipped, powerups every wave!';
-            } else if (code === '') {
-                resultDiv.innerHTML = '';
-            } else {
-                resultDiv.innerHTML = '❌ Invalid code';
+                statusDiv.innerHTML = '✅ Powerup testing mode! 2000 ammo, quizzes skipped, powerups every wave!';
+                statusDiv.style.color = 'var(--green-success)';
             }
+        }
+
+        // Single entry point for the code box: figures out whether the person typed
+        // a dev/testing shortcut or a question bank code, and handles either one.
+        async function applyCode() {
+            const codeInput = document.getElementById('bankCode');
+            const extraDiv = document.getElementById('bankExtra');
+            const code = codeInput.value.trim().toLowerCase();
+            extraDiv.innerHTML = '';
+
+            if (DEV_CODES.includes(code)) {
+                applyDevCode(code);
+                return;
+            }
+
+            await loadQuestionBank(code);
         }
 
         function restartGame() {
