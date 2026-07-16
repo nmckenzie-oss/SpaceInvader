@@ -698,6 +698,7 @@
             '93bf': 'question-banks/year-9-biology-full.json',
             '92ps': 'question-banks/year-9-physics-speed.json',
             '92pf': 'question-banks/year-9-physics-force.json',
+            'test': 'question-banks/test.json'
         };
 
         function validateQuestionBank(data) {
@@ -3235,7 +3236,7 @@
                 extraDiv.appendChild(applyBtn);
             } else if (code === 'alien') {
                 game.skipQuizzes = true;
-                game.startingAmmo = 500;
+                game.startingAmmo = 5000;
                 game.secretCodeActive = true;
                 statusDiv.innerHTML = '✅ Quiz skip mode activated! Starting with 500 ammo!';
                 statusDiv.style.color = 'var(--green-success)';
