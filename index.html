@@ -100,18 +100,22 @@
             z-index: 200;
             display: none;
             max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
             box-shadow: 0 0 35px rgba(106, 5, 114, 0.7), inset 0 0 50px rgba(106, 5, 114, 0.12);
             text-align: center;
             font-family: var(--font-ui);
         }
 
-        #quiz, #gameOver, #shop, #welcomeScreen {
+        #quiz, #gameOver, #powerupSelect, #welcomeScreen {
             border-color: var(--border-purple);
             box-shadow: 0 0 35px rgba(106, 5, 114, 0.7), inset 0 0 50px rgba(106, 5, 114, 0.12);
         }
 
-        #shop {
+        #powerupSelect, #gameOver {
             max-width: 700px;
+            max-height: 90vh;
+            overflow-y: auto;
         }
 
         .modal h1 {
@@ -454,6 +458,7 @@
     <div class="hud-row">🔫 Ammo <span class="hud-value" id="ammo">20</span></div>
     <div class="hud-row">⏱ <span class="hud-value" id="elapsedTime">00:00</span></div>
     <div class="hud-row">⭐ Score <span class="hud-value" id="score">0</span></div>
+    <div class="hud-row">🪙 Coins <span class="hud-value" id="coins">0</span></div>
     <div class="hud-row">🏆 High <span class="hud-value" id="highScore">0</span></div>
    </div>
    <div id="welcomeScreen" class="modal">
@@ -489,10 +494,12 @@
      <p><strong>Move:</strong> Arrow Keys or WASD • <strong>Shooting:</strong> Automatic</p>
      <p><strong>Goal:</strong> Answer quiz questions to get ammo, then fight aliens!</p>
      <h3>🌊 GAME FLOW</h3>
-     <p>Quiz → Fight Aliens → Quiz → Fight → Shop → Quiz → Boss Fight...</p>
-     <p>Every 5th wave: Shop first, then quiz, then boss!</p>
+     <p>Quiz → Fight Aliens → Quiz → Fight → Quiz → Boss Fight...</p>
+     <p>Defeat a boss to trigger 4 bonus questions — answer them correctly to unlock a run-only power-up choice!</p>
      <h3>🧠 QUIZ SYSTEM</h3>
      <p><strong>Correct answers = +10 Ammo</strong> • No ammo = no shooting!</p>
+     <h3>🪙 COINS & UPGRADES</h3>
+     <p>Defeating enemies earns coins that carry over between runs. Spend them on permanent upgrades from the Game Over screen!</p>
      <p style="text-align: center; margin-top: 30px; color: var(--gold);"><strong>Learn while defending the planet!</strong></p>
     </div><button id="beginGameBtn" onclick="startGame()" disabled style="font-size: 20px; padding: 15px 30px; opacity: 0.5; cursor: not-allowed;"> 🚀 BEGIN GAME 🚀 </button>
    </div>
@@ -506,22 +513,10 @@
     <div id="quizOptions"></div>
     <div id="quizResult" style="margin-top: 20px;"></div>
    </div>
-   <div id="shop" class="modal">
-    <h2 style="color: var(--green-success);">🛒 UPGRADE SHOP</h2>
-    <div class="timer" id="shopTimer">
-     30
-    </div>
-    <div style="margin: 20px 0; color: var(--gold);">
-     <div>
-      Current Score: <span id="shopScore">0</span>
-     </div>
-     <div>
-      Shields: <span id="shopShields">0</span>
-     </div>
-    </div>
-    <div id="shopUpgrades" style="max-height: 400px; overflow-y: auto;">
-     <!-- Upgrades will be populated by JavaScript -->
-    </div><button onclick="closeShop()" style="margin-top: 20px;">Continue to Quiz</button>
+   <div id="powerupSelect" class="modal">
+    <h2 style="color: var(--green-success);">⚡ CHOOSE A POWER-UP</h2>
+    <p style="color: #cccccc; margin: 0 0 10px 0;">This power-up lasts for the rest of this run only.</p>
+    <div id="powerupSelectOptions" style="max-height: 420px; overflow-y: auto;"></div>
    </div>
    <div id="gameOver" class="modal">
     <h2 style="color: var(--red-damage);">GAME OVER</h2>
@@ -543,12 +538,12 @@
      <h3>📊 Run Statistics</h3>
      <p>Enemies Defeated This Run: <span id="enemiesDefeatedThisRun">0</span></p>
      <p>Total Enemies Defeated All Time: <span id="totalEnemiesDefeated">0</span></p>
-     <p>Next Run Score Bonus: +<span id="nextRunScoreBonus">0</span> points</p>
+     <p>🪙 Coins Available: <span id="gameOverCoins">0</span></p>
     </div>
     <div id="gameOverUpgrade" class="game-over-upgrade">
-     <h3>🚀 Next Run Bonus (PERMANENT)</h3>
-     <p>Start your next game with +10 ammo per correct answer and faster fire rate!</p>
-     <p>Current Level: <span id="gameOverUpgradeLevel">0</span></p><button id="gameOverUpgradeBtn" onclick="buyGameOverUpgrade()"> Buy Level 1 (1000 Points) </button>
+     <h3>🛒 PERMANENT UPGRADES</h3>
+     <p>Spend coins on permanent upgrades that carry into every future run.</p>
+     <div id="gameOverShopUpgrades" style="max-height: 340px; overflow-y: auto;"></div>
     </div><button onclick="restartGame()">Play Again</button>
    </div>
   </div>
@@ -562,6 +557,7 @@
             GAME_OVER: 'gameOver'
         };
 
+        // Definitions for the run-specific bonus power-ups (see POWERUP_DEFS below the game object).
         // Main game object
         const game = {
             canvas: null,
@@ -570,8 +566,10 @@
             height: 0,
             state: GameState.WELCOME,
             wave: 1,
+            baseLives: 10,
             lives: 10,
             score: 0,
+            coins: 0,
             highScore: 0,
             ammo: 20,
             landscapeHeight: 80,
@@ -580,16 +578,20 @@
             // Game objects
             player: null,
             bullets: [],
+            pendingBullets: [],
             enemies: [],
             enemyBullets: [],
             boss: null,
             explosions: [],
             lastBossType: -1,
             powerups: [],
+            orbitBlades: [],
             
             // Enemy defeat tracking
             enemiesDefeatedThisRun: 0,
             totalEnemiesDefeatedAllTime: 0,
+            enemiesDefeatedForLifeSteal: 0,
+            shotsFiredThisRun: 0,
             
             // Powerup spawn system
             powerupSpawnChance: 0.1,
@@ -612,6 +614,7 @@
             enemiesSpawned: 0,
             totalEnemiesThisWave: 0,
             waveComplete: false,
+            currentWaveIsBoss: false,
             
             // Quiz timing and progress
             quizTimeLeft: 0,
@@ -620,22 +623,31 @@
             totalQuestionsThisQuiz: 0,
             usedQuestions: [],
             currentQuestionIndex: -1,
+            isBonusQuiz: false,
+            bonusCorrectCount: 0,
             
-            // Shop system
-            shopTimeLeft: 0,
-            shopTimer: null,
-            upgrades: {
+            // Permanent (cross-run) upgrades - bought with coins on the Game Over screen
+            permanentUpgrades: {
                 correctAnswerBoost: 0,
                 fireRateBoost: 0,
                 shipSpeed: 0,
                 shieldGenerator: 0,
-                nextRunBonus: 0,
                 powerupSpawnRate: 0
             },
+            
+            // Run-specific power-ups - reset every run, chosen after boss-fight bonus quizzes
+            runPowerups: {},
+            
             shields: 0,
             baseAmmoPerCorrect: 10,
             baseFireRate: 500,
             baseSpeed: 5,
+            
+            // Camera shake
+            shakeUntil: 0,
+            shakeIntensity: 0,
+            shakeOffsetX: 0,
+            shakeOffsetY: 0,
             
             // Secret code system
             secretCodeActive: false,
@@ -644,6 +656,32 @@
             skipQuizzes: false,
             powerupTestMode: false
         };
+
+        // Metadata + logic for the run-specific bonus power-ups earned after defeating a boss.
+        const POWERUP_DEFS = {
+            extraShotSpread: { name: 'Extra Shot (Spread)', maxLevel: Infinity, desc: (l) => `Fire an extra shot in a spread pattern. Level ${l+1}.` },
+            extraShotForward: { name: 'Extra Shot (Forward)', maxLevel: Infinity, desc: (l) => `Fire another forward shot beside your existing shots. Level ${l+1}.` },
+            laserShot: { name: 'Laser Shot', maxLevel: Infinity, desc: (l) => `Bullets grow 200% longer and damage anything they touch along their length. Level ${l+1}.` },
+            higherCaliber: { name: 'Higher Calibre', maxLevel: Infinity, desc: (l) => `Bullets are 100% wider with a rocket-trail pixel effect. Level ${l+1}.` },
+            repairedHulls: { name: 'Repaired Hulls', maxLevel: Infinity, desc: (l) => `+1 Health (only if below starting health). Level ${l+1}.` },
+            strongerThrusters: { name: 'Stronger Thrusters', maxLevel: Infinity, desc: (l) => `Move 10% faster with a bigger thruster effect. Level ${l+1}.` },
+            ammoGeneration: { name: 'Ammo Generation', maxLevel: Infinity, desc: (l) => `+10 ammo per correct answer. Level ${l+1}.` },
+            shieldWall: { name: 'Shield Wall', maxLevel: Infinity, desc: (l) => `+1 Bonus Health (can exceed starting health). Level ${l+1}.` },
+            luckySalvage: { name: 'Lucky Salvage', maxLevel: Infinity, desc: (l) => `Enemies have a higher chance to drop bonus coins or ammo. Level ${l+1}.` },
+            splitShot: { name: 'Split Shot', maxLevel: Infinity, desc: (l) => `Bullets split into extra bullets after travelling 30% of the screen. Level ${l+1}.` },
+            explosiveAmmo: { name: 'Explosive Ammo', maxLevel: Infinity, desc: (l) => `Bullets explode in a small radius on impact. Level ${l+1}.` },
+            lifeSteal: { name: 'Life Steal', maxLevel: 5, desc: (l) => `Recover 1 HP every ${20 - (l + 1)} enemies defeated. Level ${l+1}.` },
+            burstFire: { name: 'Burst Fire', maxLevel: Infinity, desc: (l) => `Fire bursts of bullets with a tiny delay between each shot. Level ${l+1}.` },
+            waveCannon: { name: 'Wave Cannon', maxLevel: Infinity, desc: (l) => `Bullets travel in a sine-wave pattern. Level ${l+1}.` },
+            shrapnelRounds: { name: 'Shrapnel Rounds', maxLevel: Infinity, desc: (l) => `Bullets burst into shrapnel fragments on hit/expiry. Level ${l+1}.` },
+            orbitingBlades: { name: 'Orbiting Blades', maxLevel: Infinity, desc: (l) => `Summon a rotating energy blade around your ship that damages enemies on contact. Level ${l+1}.` },
+            bulletBloom: { name: 'Bullet Bloom', maxLevel: Infinity, desc: (l) => `Bullets grow larger the farther they travel. Level ${l+1}.` },
+            boomerangShots: { name: 'Boomerang Shots', maxLevel: 1, desc: (l) => `Bullets curve back toward your ship, hitting enemies twice.` },
+            piercingRound: { name: 'Piercing Round', maxLevel: Infinity, desc: (l) => `Bullets pierce +1 additional enemy. Level ${l+1}.` },
+            fasterShot: { name: 'Faster Shot', maxLevel: Infinity, desc: (l) => `Bullets fire 10% faster. Level ${l+1}.` },
+            prismCannon: { name: 'Prism Cannon', maxLevel: Infinity, desc: (l) => `Every 5th shot randomly gains extra effects. Level ${l+1}.` }
+        };
+        const POWERUP_KEYS = Object.keys(POWERUP_DEFS);
 
 
         // The currently active set of quiz questions. A valid code MUST be loaded
@@ -754,16 +792,57 @@
         });
 
         // Game classes
+        // Builds the modifier set applied to a freshly-fired bullet, based on the
+        // player's current run-specific power-ups. `extraForce` (used by Prism Cannon)
+        // layers extra effects onto a single shot regardless of what's owned.
+        function buildBulletMods(extraForce) {
+            const rp = game.runPowerups;
+            const mods = {
+                laserLevel: rp.laserShot || 0,
+                caliberLevel: rp.higherCaliber || 0,
+                split: rp.splitShot || 0,
+                explosive: rp.explosiveAmmo || 0,
+                wave: rp.waveCannon || 0,
+                shrapnel: rp.shrapnelRounds || 0,
+                bloom: rp.bulletBloom || 0,
+                boomerang: !!rp.boomerangShots,
+                pierce: rp.piercingRound || 0
+            };
+            if (extraForce) {
+                extraForce.forEach(key => {
+                    if (key === 'laserShot') mods.laserLevel = Math.max(1, mods.laserLevel + 1);
+                    else if (key === 'higherCaliber') mods.caliberLevel = Math.max(1, mods.caliberLevel + 1);
+                    else if (key === 'splitShot') mods.split += 1;
+                    else if (key === 'explosiveAmmo') mods.explosive += 1;
+                    else if (key === 'waveCannon') mods.wave += 1;
+                    else if (key === 'shrapnelRounds') mods.shrapnel += 1;
+                    else if (key === 'bulletBloom') mods.bloom += 1;
+                    else if (key === 'boomerangShots') mods.boomerang = true;
+                    else if (key === 'piercingRound') mods.pierce += 1;
+                });
+            }
+            return mods;
+        }
+
         class Player {
             constructor(x, y) {
                 this.x = x;
                 this.y = y;
                 this.width = 76;
                 this.height = 68;
-                this.speed = game.baseSpeed + game.upgrades.shipSpeed;
+                this.thrusting = false;
+                this.animFrame = 0;
+                this.animTimer = 0;
+            }
+
+            get speed() {
+                const thrusterLevel = game.runPowerups.strongerThrusters || 0;
+                const shipSpeedMultiplier = 1 + (game.permanentUpgrades.shipSpeed * 0.1);
+                return game.baseSpeed * shipSpeedMultiplier * (1 + thrusterLevel * 0.1);
             }
 
             update() {
+                this.thrusting = false;
                 if (targetX !== null && isPointerActive) {
                     const targetPlayerX = targetX - this.width / 2;
                     const distance = targetPlayerX - this.x;
@@ -771,6 +850,7 @@
                     
                     if (Math.abs(distance) > moveSpeed) {
                         this.x += Math.sign(distance) * moveSpeed;
+                        this.thrusting = true;
                     } else {
                         this.x = targetPlayerX;
                     }
@@ -780,19 +860,25 @@
                 else {
                     if (game.keys['ArrowLeft'] || game.keys['a'] || game.keys['A']) {
                         this.x = Math.max(0, this.x - this.speed);
+                        this.thrusting = true;
                     }
                     if (game.keys['ArrowRight'] || game.keys['d'] || game.keys['D']) {
                         this.x = Math.min(game.width - this.width, this.x + this.speed);
+                        this.thrusting = true;
                     }
                 }
 
-                const now = Date.now();
-                let currentFireRate = game.baseFireRate - (game.upgrades.fireRateBoost * 50);
-                
-                // Apply next run bonus fire rate
-                if (game.upgrades.nextRunBonus > 0) {
-                    currentFireRate = currentFireRate * 0.8; // 20% faster
+                this.animTimer++;
+                if (this.animTimer % (this.thrusting ? 6 : 20) === 0) {
+                    this.animFrame = (this.animFrame + 1) % 2;
                 }
+
+                const now = Date.now();
+                let currentFireRate = game.baseFireRate * Math.pow(0.9, game.permanentUpgrades.fireRateBoost);
+                
+                // Faster Shot run power-up
+                const fasterShotLevel = game.runPowerups.fasterShot || 0;
+                currentFireRate *= Math.pow(0.9, fasterShotLevel);
                 
                 // Rapid fire powerup: 3x fire rate
                 if (game.rapidFireActive) {
@@ -803,33 +889,96 @@
                     this.shoot();
                     game.lastShot = now;
                 }
+
+                updateOrbitBlades();
             }
 
-            shoot() {
-                if (game.ammo > 0) {
-                    if (game.tripleShotActive) {
-                        game.bullets.push(new Bullet(this.x + this.width/2, this.y, 0, 'normal'));
-                        game.bullets.push(new Bullet(this.x + this.width/2 - 10, this.y, -1, 'normal'));
-                        game.bullets.push(new Bullet(this.x + this.width/2 + 10, this.y, 1, 'normal'));
-                        game.ammo--;
-                    } else if (game.rocketActive) {
-                        game.bullets.push(new Bullet(this.x + this.width/2, this.y, 0, 'rocket'));
-                        game.ammo--;
-                    } else if (game.rapidFireActive) {
-                        // Rapid fire: spread pattern, smaller bullets, 1 ammo per 3 shots
-                        const spreadAngle = (Math.random() * 20 - 10) * (Math.PI / 180); // -10 to +10 degrees
-                        game.bullets.push(new Bullet(this.x + this.width/2, this.y, 0, 'rapidfire', spreadAngle));
-                        
-                        game.rapidFireShotCounter++;
-                        if (game.rapidFireShotCounter >= 3) {
-                            game.ammo--;
-                            game.rapidFireShotCounter = 0;
-                        }
-                    } else {
-                        game.bullets.push(new Bullet(this.x + this.width/2, this.y, 0, 'normal'));
-                        game.ammo--;
+            // Builds the list of {dx, dir, type, angle} bullet specs for one shot,
+            // accounting for legacy pickup powerups plus the Extra Shot run power-ups.
+            buildShotSpecs() {
+                let specs = [];
+                if (game.tripleShotActive) {
+                    specs.push({dx: 0, dir: 0, type: 'normal'});
+                    specs.push({dx: -10, dir: -1, type: 'normal'});
+                    specs.push({dx: 10, dir: 1, type: 'normal'});
+                } else if (game.rocketActive) {
+                    specs.push({dx: 0, dir: 0, type: 'rocket'});
+                } else if (game.rapidFireActive) {
+                    const spreadAngle = (Math.random() * 20 - 10) * (Math.PI / 180);
+                    specs.push({dx: 0, dir: 0, type: 'rapidfire', angle: spreadAngle});
+                } else {
+                    specs.push({dx: 0, dir: 0, type: 'normal'});
+                }
+
+                const baseType = specs[0].type;
+
+                // Extra Shot (Forward): parallel shots beside existing ones
+                const fwdLevel = game.runPowerups.extraShotForward || 0;
+                for (let i = 0; i < fwdLevel; i++) {
+                    const side = (i % 2 === 0) ? 1 : -1;
+                    let mag = 16 * (Math.floor(i / 2) + 1);
+                    let dx = side * mag;
+                    let guard = 0;
+                    while (specs.some(s => s.dx === dx) && guard < 10) {
+                        mag += 16;
+                        dx = side * mag;
+                        guard++;
                     }
-                    updateUI();
+                    specs.push({dx, dir: 0, type: baseType === 'rocket' ? 'rocket' : (baseType === 'rapidfire' ? 'rapidfire' : 'normal')});
+                }
+
+                // Extra Shot (Spread): additional angled bullets
+                const spreadLevel = game.runPowerups.extraShotSpread || 0;
+                for (let i = 0; i < spreadLevel; i++) {
+                    const side = (i % 2 === 0) ? 1 : -1;
+                    const step = Math.ceil((i + 1) / 2);
+                    specs.push({dx: 0, dir: side * (0.6 + (step - 1) * 0.4), type: 'normal'});
+                }
+
+                return specs;
+            }
+
+            fireBullets(specs, mods) {
+                specs.forEach(s => {
+                    game.bullets.push(new Bullet(this.x + this.width / 2 + s.dx, this.y, s.dir, s.type, s.angle || 0, mods));
+                });
+            }
+
+            shoot(isBurstEcho) {
+                if (game.ammo <= 0) return;
+
+                if (!isBurstEcho) game.shotsFiredThisRun++;
+                const rp = game.runPowerups;
+                let extraForce = null;
+                if (rp.prismCannon > 0 && game.shotsFiredThisRun % 5 === 0) {
+                    const pool = ['laserShot', 'higherCaliber', 'splitShot', 'explosiveAmmo', 'waveCannon', 'shrapnelRounds', 'bulletBloom', 'boomerangShots', 'piercingRound'];
+                    extraForce = [];
+                    for (let i = 0; i < rp.prismCannon; i++) extraForce.push(pool[Math.floor(Math.random() * pool.length)]);
+                }
+
+                const mods = buildBulletMods(extraForce);
+                const specs = this.buildShotSpecs();
+                this.fireBullets(specs, mods);
+
+                if (game.rapidFireActive) {
+                    game.rapidFireShotCounter++;
+                    if (game.rapidFireShotCounter >= 3) {
+                        game.ammo--;
+                        game.rapidFireShotCounter = 0;
+                    }
+                } else {
+                    game.ammo--;
+                }
+                updateUI();
+
+                // Burst Fire: echo the same shot a few more times with a tiny delay
+                if (!isBurstEcho && rp.burstFire > 0) {
+                    for (let b = 1; b <= rp.burstFire; b++) {
+                        setTimeout(() => {
+                            if (game.state !== GameState.PLAYING) return;
+                            this.fireBullets(this.buildShotSpecs(), mods);
+                        }, b * 70);
+                    }
                 }
             }
 
@@ -838,7 +987,7 @@
                 const px = this.x;
                 const py = this.y;
                 
-                const shipPattern = [
+                const shipPatternIdle = [
                     '         #         ',
                     '        #F#        ',
                     '       #FFF#       ',
@@ -857,9 +1006,40 @@
                     '      EE   EE      ',
                     '      EE   EE      '
                 ];
-                
+
+                // Second frame: thrusters firing, with flame extended further downward
+                const shipPatternThrust = [
+                    '         #         ',
+                    '        #F#        ',
+                    '       #FFF#       ',
+                    '      #FFFFF#      ',
+                    '      #FBBBF#      ',
+                    '     #FBBBBBF#     ',
+                    '    #FFQFFFQFF#    ',
+                    '    #FFQFFFQFF#    ',
+                    '    #FFQFMFQFF#    ',
+                    '   #FFFQFMFQFFF#   ',
+                    '  #FFFQFMMMFQFFF#  ',
+                    ' #FFFQ##MMM##QFFF# ',
+                    'U#####YY#M#YY#####X',
+                    '    #YAAY#YAAY#    ',
+                    '     TAAT TAAT     ',
+                    '     TEET TEET     ',
+                    '     TEET TEET     '
+                ];
+
+                const thrusterLevel = game.runPowerups.strongerThrusters || 0;
+                const useThrustFrame = this.thrusting && this.animFrame === 1;
+                const shipPattern = useThrustFrame ? shipPatternThrust : shipPatternIdle;
+
+                const repairedLevel = game.runPowerups.repairedHulls || 0;
+                const hullSaturation = Math.min(1, repairedLevel * 0.15);
+                const hullColor = repairedLevel > 0
+                    ? `rgb(${Math.round(102 + hullSaturation * 40)}, ${Math.round(102 + hullSaturation * 90)}, ${Math.round(102 + hullSaturation * 40)})`
+                    : '#666666';
+
                 const colors = {
-                    '#': '#666666',
+                    '#': hullColor,
                     'F': '#00ccff',
                     'B': '#0066cc',
                     'Q': '#ffff00',
@@ -868,7 +1048,8 @@
                     'A': '#ff6600',
                     'E': '#ff0000',
                     'U': '#00ff00',
-                    'X': '#00ff00'
+                    'X': '#00ff00',
+                    'T': '#ffaa33'
                 };
                 
                 for (let row = 0; row < shipPattern.length; row++) {
@@ -880,6 +1061,28 @@
                         }
                     }
                 }
+
+                // Thruster particle effect, grows with Stronger Thrusters level
+                if (this.thrusting) {
+                    const flameCount = 3 + thrusterLevel * 2;
+                    for (let i = 0; i < flameCount; i++) {
+                        const spread = 10 + thrusterLevel * 2;
+                        const fx = px + this.width / 2 + (Math.random() * spread * 2 - spread);
+                        const fy = py + this.height + Math.random() * (10 + thrusterLevel * 3);
+                        game.ctx.fillStyle = Math.random() < 0.5 ? '#ffaa33' : '#ff6600';
+                        game.ctx.fillRect(fx, fy, 3, 3);
+                    }
+                }
+
+                // Shield Wall bonus-health pixel effect
+                if ((game.runPowerups.shieldWall || 0) > 0) {
+                    const pulse = Math.sin(Date.now() / 200) * 0.2 + 0.5;
+                    game.ctx.strokeStyle = `rgba(46, 204, 113, ${pulse})`;
+                    game.ctx.lineWidth = 2;
+                    game.ctx.setLineDash([4, 4]);
+                    game.ctx.strokeRect(px - 8, py - 8, this.width + 16, this.height + 16);
+                    game.ctx.setLineDash([]);
+                }
                 
                 if (game.shields > 0) {
                     const shieldAlpha = Math.sin(Date.now() / 150) * 0.3 + 0.4;
@@ -887,45 +1090,148 @@
                     game.ctx.lineWidth = 2;
                     game.ctx.strokeRect(px - 4, py - 4, this.width + 8, this.height + 8);
                 }
+
+                drawOrbitBlades(px + this.width / 2, py + this.height / 2);
             }
         }
 
         class Bullet {
-            constructor(x, y, spreadDirection = 0, type = 'normal', angle = 0) {
+            constructor(x, y, spreadDirection = 0, type = 'normal', angle = 0, mods = null, isFragment = false) {
+                this.spawnX = x;
                 this.x = x;
                 this.y = y;
+                this.startY = y;
                 this.type = type;
                 this.spreadDirection = spreadDirection;
                 this.angle = angle;
+                this.mods = mods || {};
+                this.isFragment = isFragment;
+                this.driftX = 0;
+                this.hasSplit = false;
+                this.markedForRemoval = false;
+                this.hitEnemies = new Set();
+                this.boomerangReturning = false;
                 
+                let baseWidth, baseHeight;
                 if (type === 'rocket') {
-                    this.width = 8;
-                    this.height = 24;
-                    this.speed = 10;
+                    baseWidth = 8; baseHeight = 24; this.speed = 10;
                 } else if (type === 'rapidfire') {
-                    this.width = 4;
-                    this.height = 15;
-                    this.speed = 12;
+                    baseWidth = 4; baseHeight = 15; this.speed = 12;
                 } else {
-                    this.width = 6;
-                    this.height = 20;
-                    this.speed = 8;
+                    baseWidth = 6; baseHeight = 20; this.speed = 8;
                 }
+                
+                if (isFragment) {
+                    this.width = 4;
+                    this.height = 4;
+                    this.speed = 5;
+                    this.pierceRemaining = 0;
+                } else {
+                    this.width = baseWidth * (this.mods.caliberLevel > 0 ? 2 : 1);
+                    this.height = baseHeight * (this.mods.laserLevel > 0 ? 3 : 1);
+                    this.pierceRemaining = this.mods.pierce || 0;
+                    if (this.mods.laserLevel > 0) this.pierceRemaining += 99; // laser passes through everything in its path
+                }
+                this.baseWidth = this.width;
+                this.baseHeight = this.height;
+                this.bloomScale = 1;
             }
 
             update() {
+                if (this.isFragment) {
+                    this.x += this.fragDX;
+                    this.y += this.fragDY;
+                    this.fragTraveled = (this.fragTraveled || 0) + Math.hypot(this.fragDX, this.fragDY);
+                    if (this.fragTraveled >= this.fragMaxTravel) this.markedForRemoval = true;
+                    return;
+                }
+
                 if (this.type === 'rapidfire') {
                     this.y -= this.speed * Math.cos(this.angle);
                     this.x += this.speed * Math.sin(this.angle);
+                    return;
+                }
+
+                if (this.boomerangReturning) {
+                    this.y += this.speed;
                 } else {
                     this.y -= this.speed;
-                    if (this.spreadDirection !== 0) {
-                        this.x += this.spreadDirection * 2;
+                }
+
+                if (this.spreadDirection !== 0) {
+                    this.driftX += this.spreadDirection * (this.boomerangReturning ? -2 : 2);
+                }
+
+                let waveOffset = 0;
+                if (this.mods.wave) {
+                    const traveled = Math.abs(this.startY - this.y);
+                    const amplitude = 10 + this.mods.wave * 6;
+                    waveOffset = Math.sin(traveled * 0.05) * amplitude;
+                }
+                this.x = this.spawnX + this.driftX + waveOffset;
+
+                // Bullet Bloom: grows the farther it travels
+                if (this.mods.bloom) {
+                    const traveled = Math.min(game.height, Math.abs(this.startY - this.y));
+                    const t = traveled / game.height;
+                    this.bloomScale = 1 + t * 0.1 * (1 + this.mods.bloom);
+                    this.width = this.baseWidth * this.bloomScale;
+                    this.height = this.baseHeight * this.bloomScale;
+                }
+
+                // Boomerang Shots: curve back after travelling far enough
+                if (this.mods.boomerang && !this.boomerangReturning) {
+                    const traveled = Math.abs(this.startY - this.y);
+                    if (traveled >= 220) {
+                        this.boomerangReturning = true;
+                        this.hitEnemies.clear();
+                    }
+                }
+
+                // Split Shot: break into extra bullets after travelling 30% of the screen
+                if (this.mods.split > 0 && !this.hasSplit) {
+                    const traveled = Math.abs(this.startY - this.y);
+                    if (traveled >= game.height * 0.3) {
+                        this.hasSplit = true;
+                        this.markedForRemoval = true;
+                        const count = 2 + (this.mods.split - 1);
+                        const childMods = Object.assign({}, this.mods, {split: 0});
+                        for (let i = 0; i < count; i++) {
+                            const spread = (i - (count - 1) / 2) * 1.4 || (i % 2 === 0 ? 1 : -1);
+                            const child = new Bullet(this.x, this.y, spread, this.type, this.angle, childMods);
+                            game.pendingBullets.push(child);
+                        }
                     }
                 }
             }
 
             draw() {
+                if (this.isFragment) {
+                    game.ctx.fillStyle = '#ffaa33';
+                    game.ctx.fillRect(this.x, this.y, this.width, this.height);
+                    return;
+                }
+
+                // Rocket trail / caliber trail effect
+                if (this.mods.caliberLevel > 0) {
+                    game.ctx.fillStyle = 'rgba(255, 170, 0, 0.35)';
+                    game.ctx.fillRect(this.x - this.width * 0.15, this.y + this.height * 0.6, this.width * 1.3, this.height * 0.9);
+                }
+                // Laser pixel sparkle effect
+                if (this.mods.laserLevel > 0) {
+                    for (let i = 0; i < 2; i++) {
+                        const sx = this.x + (Math.random() * this.width - this.width / 2);
+                        const sy = this.y + Math.random() * this.height;
+                        game.ctx.fillStyle = 'rgba(180, 255, 255, 0.8)';
+                        game.ctx.fillRect(sx, sy, 2, 2);
+                    }
+                }
+                // Wave Cannon glowing trail
+                if (this.mods.wave) {
+                    game.ctx.fillStyle = 'rgba(0, 255, 200, 0.25)';
+                    game.ctx.fillRect(this.x - this.width / 2, this.y + this.height * 0.3, this.width * 2, this.height * 0.6);
+                }
+
                 if (this.type === 'rocket') {
                     // Red rocket pixel art
                     const pixelSize = 2;
@@ -965,6 +1271,17 @@
                         }
                         game.ctx.fill();
                     });
+                } else if (this.mods.laserLevel > 0) {
+                    // Laser bullet - elongated cyan beam
+                    const grad = game.ctx.createLinearGradient(this.x, this.y, this.x, this.y + this.height);
+                    grad.addColorStop(0, 'rgba(150,255,255,0.1)');
+                    grad.addColorStop(0.5, '#66ffff');
+                    grad.addColorStop(1, 'rgba(150,255,255,0.1)');
+                    game.ctx.fillStyle = grad;
+                    game.ctx.fillRect(this.x - this.width / 2, this.y, this.width, this.height);
+                } else if (this.mods.caliberLevel > 0) {
+                    game.ctx.fillStyle = '#ffdd33';
+                    game.ctx.fillRect(this.x - this.width / 2, this.y, this.width, this.height);
                 } else if (this.type === 'rapidfire') {
                     // Smaller orange bullet
                     game.ctx.fillStyle = '#ff8800';
@@ -979,6 +1296,22 @@
                     game.ctx.fillRect(this.x, this.y, this.width, this.height);
                 }
             }
+        }
+
+        // Spawns small shrapnel fragments in random cardinal directions, travelling
+        // a distance equal to the bomb powerup's blast radius.
+        function spawnShrapnel(x, y, level) {
+            const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+            const maxTravel = 200 * (1 + 0.1 * (game.runPowerups.explosiveAmmo || 0));
+            for (let i = 0; i < level; i++) {
+                const [dx, dy] = dirs[Math.floor(Math.random() * dirs.length)];
+                const frag = new Bullet(x, y, 0, 'normal', 0, null, true);
+                frag.fragDX = dx * 5;
+                frag.fragDY = dy * 5;
+                frag.fragMaxTravel = maxTravel;
+                game.pendingBullets.push(frag);
+            }
+            game.explosions.push(new Explosion(x, y, 'particle', '#ffcc66', 10));
         }
 
         class Enemy {
@@ -1009,7 +1342,10 @@
                     this.animFrame = 0;
                     this.animTimer = 0;
                     this.direction = 1;
-                    this.dropDistance = 20;
+                    this.dropDistance = type === 'boss' ? 28 : 20;
+                    this.canShoot = false;
+                    this.alienFireRate = 0;
+                    this.lastAlienShot = 0;
                     
                     if (type === 'boss') {
                         this.bossType = bossType !== null ? bossType : Math.floor(Math.random() * 4);
@@ -1095,6 +1431,13 @@
                     this.updateBoss();
                 } else {
                     this.y += this.speed;
+                    if (this.canShoot && !this.isMiniAlien) {
+                        const now = Date.now();
+                        if (now - this.lastAlienShot > this.alienFireRate) {
+                            this.lastAlienShot = now;
+                            game.enemyBullets.push(new EnemyBullet(this.x + this.width / 2, this.y + this.height, 'alienshot'));
+                        }
+                    }
                 }
             }
 
@@ -1745,8 +2088,8 @@
                 this.x = x;
                 this.y = y;
                 this.type = type;
-                this.width = type === 'spider' ? 18 : 6;
-                this.height = type === 'spider' ? 36 : 12;
+                this.width = type === 'spider' ? 18 : (type === 'alienshot' ? 5 : 6);
+                this.height = type === 'spider' ? 36 : (type === 'alienshot' ? 14 : 12);
                 
                 if (type === 'destroyer' && targetX !== null && targetY !== null) {
                     const dx = targetX - x;
@@ -1756,7 +2099,7 @@
                     this.speedY = (dy / distance) * 4;
                 } else {
                     this.speedX = 0;
-                    this.speedY = 4;
+                    this.speedY = type === 'alienshot' ? 5 : 4;
                 }
                 
                 this.damage = type === 'spider' ? 2 : 1;
@@ -1770,6 +2113,8 @@
             draw() {
                 if (this.type === 'spider') {
                     game.ctx.fillStyle = '#ff0000';
+                } else if (this.type === 'alienshot') {
+                    game.ctx.fillStyle = '#aa33ff';
                 } else {
                     game.ctx.fillStyle = '#ff4400';
                 }
@@ -2053,14 +2398,29 @@
         }
 
         class Explosion {
-            constructor(x, y, type = 'normal') {
+            constructor(x, y, type = 'normal', color = '#ffcc00', particleCount = 8) {
                 this.x = x;
                 this.y = y;
                 this.type = type;
-                this.life = type === 'teleport' ? 20 : (type === 'bomb' ? 30 : (type === 'rocket' ? 25 : (type === 'healing' ? 25 : 15)));
-                this.maxLife = type === 'teleport' ? 20 : (type === 'bomb' ? 30 : (type === 'rocket' ? 25 : (type === 'healing' ? 25 : 15)));
+                this.color = color;
+                this.particleCount = particleCount;
+                this.life = type === 'teleport' ? 20 : (type === 'bomb' ? 30 : (type === 'rocket' ? 25 : (type === 'healing' ? 25 : (type === 'particle' ? 18 : 15))));
+                this.maxLife = this.life;
                 this.animFrame = 0;
                 this.animTimer = 0;
+                if (type === 'particle') {
+                    this.particles = [];
+                    for (let i = 0; i < particleCount; i++) {
+                        const angle = Math.random() * Math.PI * 2;
+                        const speed = 0.8 + Math.random() * 2.2;
+                        this.particles.push({
+                            dx: Math.cos(angle) * speed,
+                            dy: Math.sin(angle) * speed,
+                            ox: 0, oy: 0,
+                            size: 2 + Math.random() * 2
+                        });
+                    }
+                }
             }
 
             update() {
@@ -2069,9 +2429,25 @@
                 if (this.animTimer % 3 === 0) {
                     this.animFrame++;
                 }
+                if (this.type === 'particle') {
+                    this.particles.forEach(p => {
+                        p.ox += p.dx;
+                        p.oy += p.dy;
+                    });
+                }
             }
 
             draw() {
+                if (this.type === 'particle') {
+                    const alpha = Math.max(0, this.life / this.maxLife);
+                    this.particles.forEach(p => {
+                        game.ctx.fillStyle = this.color;
+                        game.ctx.globalAlpha = alpha;
+                        game.ctx.fillRect(this.x + p.ox - p.size / 2, this.y + p.oy - p.size / 2, p.size, p.size);
+                    });
+                    game.ctx.globalAlpha = 1;
+                    return;
+                }
                 if (this.type === 'healing') {
                     const pixelSize = 3;
                     const px = this.x - 12;
@@ -2689,15 +3065,13 @@
             }
             
             if (isCorrect) {
-                let ammoGain = game.baseAmmoPerCorrect + game.upgrades.correctAnswerBoost;
-                
-                // Apply next run bonus
-                if (game.upgrades.nextRunBonus > 0) {
-                    ammoGain += 10 * game.upgrades.nextRunBonus;
-                }
+                const ammoGenLevel = game.runPowerups.ammoGeneration || 0;
+                let ammoGain = game.baseAmmoPerCorrect + game.permanentUpgrades.correctAnswerBoost + (ammoGenLevel * 10);
                 
                 game.ammo += ammoGain;
                 game.score += 10;
+                
+                if (game.isBonusQuiz) game.bonusCorrectCount++;
             } else {
                 if (game.shields > 0) {
                     game.shields--;
@@ -2717,82 +3091,109 @@
             game.questionsAnswered++;
             
             setTimeout(() => {
-                if (game.difficulty === 'easy' && game.questionsAnswered >= 4) {
+                const forcedFourQuestions = game.difficulty === 'easy' || game.isBonusQuiz;
+                if (forcedFourQuestions && game.questionsAnswered >= game.totalQuestionsThisQuiz) {
                     endQuiz();
-                } else if (game.difficulty === 'easy') {
+                } else if (forcedFourQuestions) {
                     nextQuestion();
                 }
             }, 200);
         }
 
-        function buyUpgrade(upgradeType) {
-            const currentLevel = game.upgrades[upgradeType];
-            const baseCost = getBaseCost(upgradeType);
-            const cost = baseCost * Math.pow(2, currentLevel);
+        // ===== Permanent (cross-run) upgrade shop - now lives on the Game Over screen =====
+        function getPermanentUpgradeBaseCost(upgradeType) {
+            return upgradeType === 'shieldGenerator' ? 200 : 50;
+        }
+
+        function getPermanentUpgradeCost(upgradeType) {
+            const currentLevel = game.permanentUpgrades[upgradeType];
+            return getPermanentUpgradeBaseCost(upgradeType) * Math.pow(2, currentLevel);
+        }
+
+        function loadPermanentUpgrades() {
+            const saved = JSON.parse(localStorage.getItem('permanentUpgrades') || 'null');
+            game.permanentUpgrades = Object.assign({
+                correctAnswerBoost: 0,
+                fireRateBoost: 0,
+                shipSpeed: 0,
+                shieldGenerator: 0,
+                powerupSpawnRate: 0
+            }, saved || {});
+        }
+
+        function savePermanentUpgrades() {
+            localStorage.setItem('permanentUpgrades', JSON.stringify(game.permanentUpgrades));
+        }
+
+        function buyPermanentUpgrade(upgradeType) {
+            const cost = getPermanentUpgradeCost(upgradeType);
+            if (game.coins < cost) return;
             
-            if (game.score >= cost) {
-                game.score -= cost;
-                game.upgrades[upgradeType]++;
+            game.coins -= cost;
+            game.permanentUpgrades[upgradeType]++;
+            savePermanentUpgrades();
+            localStorage.setItem('coins', game.coins.toString());
+            
+            renderGameOverShop();
+            updateUI();
+        }
+
+        function renderGameOverShop() {
+            const upgradesDiv = document.getElementById('gameOverShopUpgrades');
+            if (!upgradesDiv) return;
+            upgradesDiv.innerHTML = '';
+            
+            document.getElementById('gameOverCoins').textContent = game.coins;
+            
+            const upgradeData = {
+                correctAnswerBoost: {
+                    name: 'Correct Answer Boost',
+                    description: 'Get +5 more ammo per correct answer'
+                },
+                fireRateBoost: {
+                    name: 'Fire Rate Boost',
+                    description: 'Shoot 10% faster per level'
+                },
+                shipSpeed: {
+                    name: 'Ship Speed',
+                    description: 'Move 10% faster per level'
+                },
+                shieldGenerator: {
+                    name: 'Shield Generator',
+                    description: 'Start every run with 1 more permanent shield layer'
+                },
+                powerupSpawnRate: {
+                    name: 'Powerup Spawn Rate',
+                    description: 'Increase powerup spawn chance by 5% per level'
+                }
+            };
+            
+            Object.keys(upgradeData).forEach(upgradeType => {
+                const data = upgradeData[upgradeType];
+                const currentLevel = game.permanentUpgrades[upgradeType];
+                const cost = getPermanentUpgradeCost(upgradeType);
                 
-                if (upgradeType === 'shieldGenerator') {
-                    game.shields++;
+                const upgradeDiv = document.createElement('div');
+                upgradeDiv.className = 'upgrade-item';
+                
+                if (game.coins < cost) {
+                    upgradeDiv.classList.add('cant-afford');
                 }
                 
-                updateShop();
-                updateUI();
-            }
-        }
-
-        function getBaseCost(upgradeType) {
-            const baseCosts = {
-                correctAnswerBoost: 100,
-                fireRateBoost: 100,
-                shipSpeed: 150,
-                shieldGenerator: 200,
-                powerupSpawnRate: 200,
-                nextRunBonus: 1000
-            };
-            return baseCosts[upgradeType];
-        }
-
-        function buyGameOverUpgrade() {
-            const currentLevel = game.upgrades.nextRunBonus;
-            const baseCost = 1000;
-            const cost = baseCost * Math.pow(2, currentLevel);
-            
-            if (game.score >= cost) {
-                game.score -= cost;
-                game.upgrades.nextRunBonus++;
+                upgradeDiv.innerHTML = `
+                    <div class="upgrade-info">
+                        <div class="upgrade-name">${data.name}</div>
+                        <div class="upgrade-description">${data.description}</div>
+                        <div class="upgrade-level">Level: ${currentLevel} • Next Cost: ${cost} 🪙</div>
+                    </div>
+                    <button class="upgrade-buy" onclick="buyPermanentUpgrade('${upgradeType}')" 
+                            ${game.coins < cost ? 'disabled' : ''}>
+                        Buy (${cost})
+                    </button>
+                `;
                 
-                // Save permanent upgrade
-                localStorage.setItem('nextRunBonus', game.upgrades.nextRunBonus.toString());
-                
-                updateGameOverUpgrade();
-                updateUI();
-            }
-        }
-
-        function updateGameOverUpgrade() {
-            const currentLevel = game.upgrades.nextRunBonus;
-            const baseCost = 1000;
-            const cost = baseCost * Math.pow(2, currentLevel);
-            
-            document.getElementById('gameOverUpgradeLevel').textContent = currentLevel;
-            
-            const btn = document.getElementById('gameOverUpgradeBtn');
-            if (game.score < cost) {
-                btn.textContent = `Buy Level ${currentLevel + 1} (${cost} Points)`;
-                btn.disabled = true;
-            } else {
-                btn.textContent = `Buy Level ${currentLevel + 1} (${cost} Points)`;
-                btn.disabled = false;
-            }
-        }
-
-        function closeShop() {
-            hideAllModals();
-            clearInterval(game.shopTimer);
-            startQuiz();
+                upgradesDiv.appendChild(upgradeDiv);
+            });
         }
 
         // Developer/testing shortcuts - typed into the SAME code box as question bank codes.
@@ -2864,37 +3265,34 @@
         }
 
         function restartGame() {
-            // Load permanent upgrades
-            const savedNextRunBonus = parseInt(localStorage.getItem('nextRunBonus') || '0');
+            loadPermanentUpgrades();
             const savedTotalEnemiesDefeated = parseInt(localStorage.getItem('totalEnemiesDefeated') || '0');
+            const savedCoins = parseInt(localStorage.getItem('coins') || '0');
             
             game.wave = game.secretCodeActive ? game.startingWave : 1;
-            game.lives = 10;
-            game.score = savedTotalEnemiesDefeated; // Start with bonus score from previous runs
+            game.baseLives = 10;
+            game.lives = game.baseLives;
+            game.score = 0;
+            game.coins = savedCoins;
             game.ammo = game.secretCodeActive ? game.startingAmmo : 20;
-            game.shields = 0;
+            game.shields = game.permanentUpgrades.shieldGenerator;
             game.bullets = [];
+            game.pendingBullets = [];
             game.enemyBullets = [];
             game.enemies = [];
             game.explosions = [];
             game.powerups = [];
+            game.orbitBlades = [];
             game.powerupSpawnChance = 0.1;
             game.tripleShotActive = false;
             game.rocketActive = false;
             game.rapidFireActive = false;
             game.rapidFireShotCounter = 0;
             game.enemiesDefeatedThisRun = 0;
+            game.enemiesDefeatedForLifeSteal = 0;
+            game.shotsFiredThisRun = 0;
             game.totalEnemiesDefeatedAllTime = savedTotalEnemiesDefeated;
-            
-            // Reset upgrades but keep permanent next run bonus
-            game.upgrades = {
-                correctAnswerBoost: 0,
-                fireRateBoost: 0,
-                shipSpeed: 0,
-                shieldGenerator: 0,
-                nextRunBonus: savedNextRunBonus,
-                powerupSpawnRate: 0
-            };
+            game.runPowerups = {};
             
             game.secretCodeActive = false;
             game.startingWave = 1;
@@ -2925,13 +3323,17 @@
             
             game.highScore = parseInt(localStorage.getItem('spaceInvadersHighScore') || '0');
             
-            // Load permanent upgrades
-            const savedNextRunBonus = parseInt(localStorage.getItem('nextRunBonus') || '0');
+            loadPermanentUpgrades();
             const savedTotalEnemiesDefeated = parseInt(localStorage.getItem('totalEnemiesDefeated') || '0');
+            const savedCoins = parseInt(localStorage.getItem('coins') || '0');
             
-            game.upgrades.nextRunBonus = savedNextRunBonus;
             game.totalEnemiesDefeatedAllTime = savedTotalEnemiesDefeated;
-            game.score += savedTotalEnemiesDefeated; // Add bonus score from previous runs
+            game.coins = savedCoins;
+            game.score = 0;
+            game.baseLives = 10;
+            game.lives = game.baseLives;
+            game.shields = game.permanentUpgrades.shieldGenerator;
+            game.runPowerups = {};
             
             if (game.secretCodeActive) {
                 game.wave = game.startingWave;
@@ -2964,6 +3366,8 @@
         }
 
         function startQuiz() {
+            game.isBonusQuiz = false;
+            
             if (game.skipQuizzes) {
                 startWave();
                 return;
@@ -2977,6 +3381,29 @@
                 game.totalQuestionsThisQuiz = 4;
             }
             
+            document.getElementById('quizTitleText').textContent = currentSubjectName ? currentSubjectName.toUpperCase() : '';
+            document.getElementById('quiz').style.display = 'block';
+            nextQuestion();
+        }
+
+        // Item 8: after defeating a boss, 4 bonus questions replace the normal post-boss
+        // quiz. Correct answers still grant ammo as usual, and the number answered
+        // correctly determines how many run-only power-up options are unlocked.
+        function startBonusQuiz() {
+            game.isBonusQuiz = true;
+            game.bonusCorrectCount = 0;
+            
+            if (game.skipQuizzes) {
+                showBonusPowerupSelect(4);
+                return;
+            }
+            
+            game.state = GameState.QUIZ;
+            game.questionsAnswered = 0;
+            game.usedQuestions = [];
+            game.totalQuestionsThisQuiz = 4;
+            
+            document.getElementById('quizTitleText').textContent = '🏆 BONUS: ' + (currentSubjectName ? currentSubjectName.toUpperCase() : '');
             document.getElementById('quiz').style.display = 'block';
             nextQuestion();
         }
@@ -3012,13 +3439,13 @@
                 optionsDiv.appendChild(optionDiv);
             });
             
-            if (game.difficulty === 'easy') {
+            if (game.difficulty === 'easy' || game.isBonusQuiz) {
                 document.getElementById('quizProgress').textContent = `Question ${game.questionsAnswered + 1} of ${game.totalQuestionsThisQuiz}`;
             } else {
                 document.getElementById('quizProgress').textContent = `Questions Answered: ${game.questionsAnswered}`;
             }
             
-            if (game.difficulty === 'medium') {
+            if (game.difficulty === 'medium' && !game.isBonusQuiz) {
                 if (game.questionsAnswered === 0) {
                     game.quizTimeLeft = 15;
                     game.quizTimer = setInterval(() => {
@@ -3039,96 +3466,78 @@
         }
 
         function endQuiz() {
+            clearInterval(game.quizTimer);
+            hideAllModals();
+            if (game.isBonusQuiz) {
+                showBonusPowerupSelect(game.bonusCorrectCount);
+            } else {
+                startWave();
+            }
+        }
+
+        // Presents `count` random, unique power-up options; the player picks exactly one.
+        function showBonusPowerupSelect(count) {
+            game.isBonusQuiz = false;
+            
+            if (count <= 0) {
+                startWave();
+                return;
+            }
+            
+            const pool = POWERUP_KEYS.slice();
+            // Boomerang Shots can only be picked once - drop it from the pool if already owned
+            const filteredPool = pool.filter(key => {
+                if (key === 'boomerangShots' && (game.runPowerups.boomerangShots || 0) >= 1) return false;
+                const maxLevel = POWERUP_DEFS[key].maxLevel;
+                if ((game.runPowerups[key] || 0) >= maxLevel) return false;
+                return true;
+            });
+            
+            for (let i = filteredPool.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [filteredPool[i], filteredPool[j]] = [filteredPool[j], filteredPool[i]];
+            }
+            
+            const options = filteredPool.slice(0, Math.min(count, filteredPool.length));
+            
+            game.state = GameState.QUIZ; // reuse quiz-like pause state so gameplay stays frozen
+            const container = document.getElementById('powerupSelectOptions');
+            container.innerHTML = '';
+            
+            options.forEach(key => {
+                const def = POWERUP_DEFS[key];
+                const level = game.runPowerups[key] || 0;
+                const div = document.createElement('div');
+                div.className = 'option';
+                div.innerHTML = `<strong style="color: var(--blue-highlight);">${def.name}${level > 0 ? ` (Owned - Lv ${level})` : ''}</strong><br><span style="font-size: 14px; color: #cccccc;">${def.desc(level)}</span>`;
+                div.onclick = () => choosePowerup(key);
+                container.appendChild(div);
+            });
+            
+            hideAllModals();
+            document.getElementById('powerupSelect').style.display = 'block';
+        }
+
+        function choosePowerup(key) {
+            game.runPowerups[key] = (game.runPowerups[key] || 0) + 1;
+            
+            // Immediate one-off effects
+            if (key === 'repairedHulls') {
+                if (game.lives < game.baseLives) game.lives++;
+            } else if (key === 'shieldWall') {
+                game.lives++;
+            }
+            
+            updateUI();
             hideAllModals();
             startWave();
-        }
-
-        function showShop() {
-            game.state = GameState.SHOP;
-            document.getElementById('shop').style.display = 'block';
-            
-            document.getElementById('shopScore').textContent = game.score;
-            document.getElementById('shopShields').textContent = game.shields;
-            
-            game.shopTimeLeft = 30;
-            document.getElementById('shopTimer').textContent = game.shopTimeLeft;
-            
-            game.shopTimer = setInterval(() => {
-                game.shopTimeLeft--;
-                document.getElementById('shopTimer').textContent = game.shopTimeLeft;
-                
-                if (game.shopTimeLeft <= 0) {
-                    closeShop();
-                }
-            }, 1000);
-            
-            updateShop();
-        }
-
-        function updateShop() {
-            const upgradesDiv = document.getElementById('shopUpgrades');
-            upgradesDiv.innerHTML = '';
-            
-            const upgradeData = {
-                correctAnswerBoost: {
-                    name: 'Correct Answer Boost',
-                    description: 'Get +5 more ammo per correct answer'
-                },
-                fireRateBoost: {
-                    name: 'Fire Rate Boost',
-                    description: 'Shoot 0.25 times faster per level'
-                },
-                shipSpeed: {
-                    name: 'Ship Speed',
-                    description: 'Move 20% faster per level'
-                },
-                shieldGenerator: {
-                    name: 'Shield Generator',
-                    description: 'Gain 1 permanent shield layer'
-                },
-                powerupSpawnRate: {
-                    name: 'Powerup Spawn Rate',
-                    description: 'Increase powerup spawn chance by 5% per level'
-                },
-                nextRunBonus: {
-                    name: 'Next Run Bonus (PERMANENT)',
-                    description: 'Start next game with +10 ammo per answer & faster fire rate'
-                }
-            };
-            
-            Object.keys(upgradeData).forEach(upgradeType => {
-                const data = upgradeData[upgradeType];
-                const currentLevel = game.upgrades[upgradeType];
-                const baseCost = getBaseCost(upgradeType);
-                const cost = baseCost * Math.pow(2, currentLevel);
-                
-                const upgradeDiv = document.createElement('div');
-                upgradeDiv.className = 'upgrade-item';
-                
-                if (game.score < cost) {
-                    upgradeDiv.classList.add('cant-afford');
-                }
-                
-                upgradeDiv.innerHTML = `
-                    <div class="upgrade-info">
-                        <div class="upgrade-name">${data.name}</div>
-                        <div class="upgrade-description">${data.description}</div>
-                        <div class="upgrade-level">Level: ${currentLevel} • Next Cost: ${cost}</div>
-                    </div>
-                    <button class="upgrade-buy" onclick="buyUpgrade('${upgradeType}')" 
-                            ${game.score < cost ? 'disabled' : ''}>
-                        Buy (${cost})
-                    </button>
-                `;
-                
-                upgradesDiv.appendChild(upgradeDiv);
-            });
         }
 
         function startWave() {
             game.state = GameState.PLAYING;
             game.enemies = [];
             game.bullets = [];
+            game.pendingBullets = [];
             game.explosions = [];
             game.powerups = [];
             game.tripleShotActive = false;
@@ -3137,7 +3546,7 @@
             game.rapidFireShotCounter = 0;
             
             game.powerupSpawnScheduled = false;
-            const upgradeBonus = game.upgrades.powerupSpawnRate * 0.05;
+            const upgradeBonus = game.permanentUpgrades.powerupSpawnRate * 0.05;
             const totalSpawnChance = game.powerupSpawnChance + upgradeBonus;
             const shouldSpawn = game.powerupTestMode || Math.random() < totalSpawnChance;
             if (shouldSpawn) {
@@ -3149,15 +3558,24 @@
             }
             
             if (game.wave % 5 === 0) {
-                let bossType;
-                do {
-                    bossType = Math.floor(Math.random() * 4);
-                } while (bossType === game.lastBossType && game.wave > 5);
-                
-                game.lastBossType = bossType;
-                game.enemies.push(new Enemy(game.width / 2 - 48, 50, 'boss', 0, bossType));
+                game.currentWaveIsBoss = true;
                 game.totalEnemiesThisWave = 1;
+                
+                // Item 4: camera shake to telegraph the boss, then spawn it
+                game.waveComplete = true; // hold off the "wave complete" check until the boss exists
+                triggerShake(650, 9);
+                setTimeout(() => {
+                    let bossType;
+                    do {
+                        bossType = Math.floor(Math.random() * 4);
+                    } while (bossType === game.lastBossType && game.wave > 5);
+                    
+                    game.lastBossType = bossType;
+                    game.enemies.push(new Enemy(game.width / 2 - 48, 50, 'boss', 0, bossType));
+                    game.waveComplete = false;
+                }, 550);
             } else {
+                game.currentWaveIsBoss = false;
                 const enemyCount = game.wave * 2;
                 game.totalEnemiesThisWave = enemyCount;
                 
@@ -3183,9 +3601,20 @@
                     
                     game.enemies.push(new Enemy(x, y, 'normal', deployDelay));
                 }
+                
+                // Item 5: a number of random aliens (equal to the wave number) can fire
+                // straight down at the player this wave.
+                const shooterCount = Math.min(game.wave, game.enemies.length);
+                const shuffled = game.enemies.slice().sort(() => Math.random() - 0.5);
+                for (let i = 0; i < shooterCount; i++) {
+                    shuffled[i].canShoot = true;
+                    shuffled[i].alienFireRate = 1500 + Math.random() * 2000;
+                    shuffled[i].lastAlienShot = Date.now() + Math.random() * 2000;
+                }
+                
+                game.waveComplete = false;
             }
             
-            game.waveComplete = false;
             updateUI();
         }
 
@@ -3194,6 +3623,7 @@
                 update();
                 draw();
             }
+            applyFrameTransform();
             requestAnimationFrame(gameLoop);
         }
 
@@ -3208,8 +3638,17 @@
             
             game.bullets = game.bullets.filter(bullet => {
                 bullet.update();
-                return bullet.y > -bullet.height;
+                const offscreen = bullet.isFragment ? false : (bullet.y < -bullet.height - 20 || bullet.y > game.height + 20);
+                const remove = bullet.markedForRemoval || offscreen;
+                if (remove && !bullet.markedForRemoval && !bullet.isFragment && bullet.mods && bullet.mods.shrapnel > 0) {
+                    spawnShrapnel(bullet.x, bullet.y, bullet.mods.shrapnel);
+                }
+                return !remove;
             });
+            if (game.pendingBullets.length) {
+                game.bullets = game.bullets.concat(game.pendingBullets);
+                game.pendingBullets = [];
+            }
             
             game.enemyBullets = game.enemyBullets.filter(bullet => {
                 bullet.update();
@@ -3256,13 +3695,18 @@
             });
             
             checkCollisions();
+            if (game.pendingBullets.length) {
+                game.bullets = game.bullets.concat(game.pendingBullets);
+                game.pendingBullets = [];
+            }
             
-            if (game.enemies.length === 0 && !game.waveComplete) {
+            if (game.enemies.length === 0 && !game.waveComplete && game.state === GameState.PLAYING) {
                 game.waveComplete = true;
+                const wasBossWave = game.currentWaveIsBoss;
                 game.wave++;
                 setTimeout(() => {
-                    if (game.wave % 5 === 0) {
-                        showShop();
+                    if (wasBossWave) {
+                        startBonusQuiz();
                     } else {
                         startQuiz();
                     }
@@ -3324,10 +3768,124 @@
             return Math.sqrt(dx * dx + dy * dy) <= threshold;
         }
 
+        // Central bookkeeping whenever any enemy is defeated: score, coins (item 2),
+        // Lucky Salvage bonus drops, and Life Steal healing.
+        function onEnemyDefeated(enemy, cx, cy) {
+            game.score += enemy.pointValue;
+            game.coins += 1;
+            game.enemiesDefeatedThisRun++;
+            game.enemiesDefeatedForLifeSteal++;
+
+            const luckyLevel = game.runPowerups.luckySalvage || 0;
+            if (luckyLevel > 0) {
+                if (Math.random() < luckyLevel * 0.20) {
+                    game.coins += 1;
+                    game.explosions.push(new Explosion(cx, cy, 'particle', '#ffd700', 10));
+                }
+                if (Math.random() < luckyLevel * 0.05) {
+                    game.ammo += 5;
+                    game.explosions.push(new Explosion(cx, cy, 'particle', '#ffd700', 10));
+                }
+            }
+
+            const lifeStealLevel = game.runPowerups.lifeSteal || 0;
+            if (lifeStealLevel > 0) {
+                const threshold = 20 - lifeStealLevel;
+                if (game.enemiesDefeatedForLifeSteal >= threshold) {
+                    game.enemiesDefeatedForLifeSteal = 0;
+                    game.lives++;
+                    game.explosions.push(new Explosion(cx, cy, 'particle', '#33ff66', 12));
+                    game.explosions.push(new Explosion(game.player.x + game.player.width / 2, game.player.y + game.player.height / 2, 'particle', '#33ff66', 12));
+                }
+            }
+        }
+
+        // Explosive Ammo: small-radius splash damage around a bullet impact point.
+        function explosiveSplash(cx, cy, level) {
+            const radius = 18 * (1 + 0.25 * (level - 1));
+            game.explosions.push(new Explosion(cx, cy, 'particle', '#ff8800', 14));
+            for (let k = game.enemies.length - 1; k >= 0; k--) {
+                const e = game.enemies[k];
+                const ecx = e.x + e.width / 2, ecy = e.y + e.height / 2;
+                if (Math.hypot(ecx - cx, ecy - cy) <= radius) {
+                    e.health--;
+                    if (e.health <= 0) {
+                        onEnemyDefeated(e, ecx, ecy);
+                        game.explosions.push(new Explosion(ecx, ecy, 'normal'));
+                        game.enemies.splice(k, 1);
+                    }
+                }
+            }
+        }
+
+        function updateOrbitBlades() {
+            const level = game.runPowerups.orbitingBlades || 0;
+            while (game.orbitBlades.length < level) game.orbitBlades.push({});
+            while (game.orbitBlades.length > level) game.orbitBlades.pop();
+            if (level === 0) return;
+
+            const now = Date.now();
+            if (!game.orbitBladeLastDrain) game.orbitBladeLastDrain = now;
+            if (now - game.orbitBladeLastDrain > 2000) {
+                game.orbitBladeLastDrain = now;
+                if (game.ammo > 0) {
+                    game.ammo = Math.max(0, game.ammo - level);
+                    updateUI();
+                }
+            }
+        }
+
+        function drawOrbitBlades(centerX, centerY) {
+            const level = game.runPowerups.orbitingBlades || 0;
+            if (level === 0) return;
+            const radius = 55;
+            const t = Date.now() / 300;
+            game.orbitBlades.forEach((blade, i) => {
+                const angle = t + (i / level) * Math.PI * 2;
+                const bx = centerX + Math.cos(angle) * radius;
+                const by = centerY + Math.sin(angle) * radius * 0.6;
+                blade.x = bx;
+                blade.y = by;
+                game.ctx.save();
+                game.ctx.translate(bx, by);
+                game.ctx.rotate(angle * 3);
+                game.ctx.fillStyle = '#66ffff';
+                game.ctx.fillRect(-6, -2, 12, 4);
+                game.ctx.fillStyle = '#ffffff';
+                game.ctx.fillRect(-2, -6, 4, 12);
+                game.ctx.restore();
+            });
+        }
+
+        function checkOrbitBladeCollisions() {
+            const level = game.runPowerups.orbitingBlades || 0;
+            if (level === 0 || game.ammo <= 0) return;
+            const now = Date.now();
+            game.orbitBlades.forEach(blade => {
+                if (blade.x === undefined) return;
+                for (let k = game.enemies.length - 1; k >= 0; k--) {
+                    const e = game.enemies[k];
+                    if (e._lastBladeHit && now - e._lastBladeHit < 400) continue;
+                    const ecx = e.x + e.width / 2, ecy = e.y + e.height / 2;
+                    if (Math.hypot(ecx - blade.x, ecy - blade.y) < 20) {
+                        e._lastBladeHit = now;
+                        e.health--;
+                        game.explosions.push(new Explosion(ecx, ecy, 'particle', '#66ffff', 6));
+                        if (e.health <= 0) {
+                            onEnemyDefeated(e, ecx, ecy);
+                            game.explosions.push(new Explosion(ecx, ecy, 'normal'));
+                            game.enemies.splice(k, 1);
+                        }
+                    }
+                }
+            });
+        }
+
         function activateBombPowerup(x, y) {
             game.explosions.push(new Explosion(x, y, 'bomb'));
             
-            const explosionRadius = 200;
+            const explosiveAmmoLevel = game.runPowerups.explosiveAmmo || 0;
+            const explosionRadius = 200 * (1 + 0.1 * explosiveAmmoLevel);
             
             for (let i = game.enemies.length - 1; i >= 0; i--) {
                 const enemy = game.enemies[i];
@@ -3340,8 +3898,7 @@
                 );
                 
                 if (distance <= explosionRadius) {
-                    game.score += enemy.pointValue;
-                    game.enemiesDefeatedThisRun++;
+                    onEnemyDefeated(enemy, enemyCenterX, enemyCenterY);
                     
                     game.explosions.push(new Explosion(
                         enemyCenterX, 
@@ -3429,9 +3986,30 @@
             
             for (let i = game.bullets.length - 1; i >= 0; i--) {
                 const bullet = game.bullets[i];
+                if (bullet.isFragment) {
+                    for (let j = game.enemies.length - 1; j >= 0; j--) {
+                        const enemy = game.enemies[j];
+                        if (bullet.x < enemy.x + enemy.width && bullet.x + bullet.width > enemy.x &&
+                            bullet.y < enemy.y + enemy.height && bullet.y + bullet.height > enemy.y) {
+                            enemy.health--;
+                            const ecx = enemy.x + enemy.width/2, ecy = enemy.y + enemy.height/2;
+                            game.explosions.push(new Explosion(ecx, ecy));
+                            if (enemy.health <= 0) {
+                                onEnemyDefeated(enemy, ecx, ecy);
+                                game.enemies.splice(j, 1);
+                            }
+                            game.bullets.splice(i, 1);
+                            updateUI();
+                            break;
+                        }
+                    }
+                    continue;
+                }
                 
                 for (let j = game.enemies.length - 1; j >= 0; j--) {
                     const enemy = game.enemies[j];
+                    
+                    if (bullet.hitEnemies && bullet.hitEnemies.has(enemy)) continue;
                     
                     if (bullet.x < enemy.x + enemy.width &&
                         bullet.x + bullet.width > enemy.x &&
@@ -3458,34 +4036,47 @@
                                 if (distance <= rocketRadius) {
                                     targetEnemy.health--;
                                     if (targetEnemy.health <= 0) {
-                                        game.score += targetEnemy.pointValue;
-                                        game.enemiesDefeatedThisRun++;
+                                        onEnemyDefeated(targetEnemy, enemyCenterX, enemyCenterY);
                                         game.explosions.push(new Explosion(enemyCenterX, enemyCenterY, 'normal'));
                                         game.enemies.splice(k, 1);
                                     }
                                 }
                             }
+                            game.bullets.splice(i, 1);
                         } else {
                             // Normal bullet hit
-                            game.explosions.push(new Explosion(enemy.x + enemy.width/2, enemy.y + enemy.height/2));
+                            const ecx = enemy.x + enemy.width/2, ecy = enemy.y + enemy.height/2;
+                            game.explosions.push(new Explosion(ecx, ecy));
                             
                             enemy.health--;
+                            bullet.hitEnemies.add(enemy);
+                            
+                            if (bullet.mods.explosive > 0) explosiveSplash(ecx, ecy, bullet.mods.explosive);
+                            if (bullet.mods.shrapnel > 0) spawnShrapnel(ecx, ecy, bullet.mods.shrapnel);
+                            
                             if (enemy.health <= 0) {
-                                game.score += enemy.pointValue;
-                                game.enemiesDefeatedThisRun++;
+                                onEnemyDefeated(enemy, ecx, ecy);
                                 game.enemies.splice(j, 1);
+                            }
+                            
+                            if (bullet.pierceRemaining > 0) {
+                                bullet.pierceRemaining--;
+                            } else {
+                                game.bullets.splice(i, 1);
                             }
                         }
                         
-                        game.bullets.splice(i, 1);
                         updateUI();
                         break;
                     }
                 }
             }
             
+            checkOrbitBladeCollisions();
+            
             game.enemies.forEach((enemy, enemyIndex) => {
-                if (enemy.x < game.player.x + game.player.width &&
+                if (enemy.type !== 'boss' &&
+                    enemy.x < game.player.x + game.player.width &&
                     enemy.x + enemy.width > game.player.x &&
                     enemy.y < game.player.y + game.player.height &&
                     enemy.y + enemy.height > game.player.y) {
@@ -3505,7 +4096,14 @@
                     updateUI();
                 }
                 
-                if (enemy.y + enemy.height > game.height - game.landscapeHeight) {
+                if (enemy.type === 'boss') {
+                    // Item 1: boss bodies never hurt the player on contact - only their
+                    // shots do. If a boss reaches the ground, it's instant game over.
+                    if (enemy.y + enemy.height > game.height - game.landscapeHeight) {
+                        gameOver();
+                        return;
+                    }
+                } else if (enemy.y + enemy.height > game.height - game.landscapeHeight) {
                     game.explosions.push(new Explosion(
                         enemy.x + enemy.width/2, 
                         game.height - game.landscapeHeight
@@ -3627,6 +4225,7 @@
             document.getElementById('wave').textContent = game.wave;
             document.getElementById('lives').textContent = game.lives;
             document.getElementById('score').textContent = game.score;
+            document.getElementById('coins').textContent = game.coins;
             document.getElementById('highScore').textContent = game.highScore;
             document.getElementById('ammo').textContent = game.ammo;
             document.getElementById('shields').textContent = game.shields;
@@ -3644,11 +4243,16 @@
         }
 
         function gameOver() {
+            if (game.state === GameState.GAME_OVER) return;
             game.state = GameState.GAME_OVER;
+            clearInterval(game.quizTimer);
             
             // Update total enemies defeated
             game.totalEnemiesDefeatedAllTime += game.enemiesDefeatedThisRun;
             localStorage.setItem('totalEnemiesDefeated', game.totalEnemiesDefeatedAllTime.toString());
+            
+            // Item 2: coins persist across runs
+            localStorage.setItem('coins', game.coins.toString());
             
             if (game.score > game.highScore) {
                 game.highScore = game.score;
@@ -3663,10 +4267,10 @@
             document.getElementById('finalWave').textContent = game.wave;
             document.getElementById('enemiesDefeatedThisRun').textContent = game.enemiesDefeatedThisRun;
             document.getElementById('totalEnemiesDefeated').textContent = game.totalEnemiesDefeatedAllTime;
-            document.getElementById('nextRunScoreBonus').textContent = game.totalEnemiesDefeatedAllTime;
             
-            updateGameOverUpgrade();
+            renderGameOverShop();
             
+            hideAllModals();
             document.getElementById('gameOver').style.display = 'block';
         }
 
@@ -3756,11 +4360,32 @@
             }
         });
 
+        let currentFrameScale = 1;
+
+        function triggerShake(duration, intensity) {
+            game.shakeUntil = Date.now() + duration;
+            game.shakeIntensity = intensity;
+        }
+
+        function applyFrameTransform() {
+            const frame = document.getElementById('canvasFrame');
+            if (!frame) return;
+            let dx = 0, dy = 0;
+            if (Date.now() < game.shakeUntil) {
+                const remaining = (game.shakeUntil - Date.now());
+                const decay = Math.max(0, Math.min(1, remaining / 650));
+                const mag = game.shakeIntensity * decay;
+                dx = (Math.random() * 2 - 1) * mag;
+                dy = (Math.random() * 2 - 1) * mag;
+            }
+            frame.style.transform = `scale(${currentFrameScale}) translate(${dx}px, ${dy}px)`;
+        }
+
         function resizeCanvasFrame() {
             const frame = document.getElementById('canvasFrame');
             if (!frame) return;
-            const scale = Math.min(window.innerWidth / 800, window.innerHeight / 600);
-            frame.style.transform = `scale(${scale})`;
+            currentFrameScale = Math.min(window.innerWidth / 800, window.innerHeight / 600);
+            applyFrameTransform();
         }
 
         window.addEventListener('resize', resizeCanvasFrame);
