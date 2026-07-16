@@ -631,7 +631,7 @@
                 correctAnswerBoost: 0,
                 fireRateBoost: 0,
                 shipSpeed: 0,
-                shieldGenerator: 0,
+                extraLife: 0,
                 powerupSpawnRate: 0
             },
             
@@ -1181,10 +1181,12 @@
                     this.height = this.baseHeight * this.bloomScale;
                 }
 
-                // Boomerang Shots: curve back after travelling far enough
+                // Boomerang Shots: curve back after covering 75% of the distance from
+                // where it was fired up to the top of the screen.
                 if (this.mods.boomerang && !this.boomerangReturning) {
                     const traveled = Math.abs(this.startY - this.y);
-                    if (traveled >= 220) {
+                    const boomerangRange = this.startY * 0.75;
+                    if (traveled >= boomerangRange) {
                         this.boomerangReturning = true;
                         this.hitEnemies.clear();
                     }
@@ -1304,7 +1306,7 @@
         // a distance equal to the bomb powerup's blast radius.
         function spawnShrapnel(x, y, level) {
             const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
-            const maxTravel = 200 * (1 + 0.1 * (game.runPowerups.explosiveAmmo || 0));
+            const maxTravel = 80 * (1 + 0.1 * (game.runPowerups.explosiveAmmo || 0));
             for (let i = 0; i < level; i++) {
                 const [dx, dy] = dirs[Math.floor(Math.random() * dirs.length)];
                 const frag = new Bullet(x, y, 0, 'normal', 0, null, true);
@@ -3046,7 +3048,12 @@
             if (game.state !== GameState.QUIZ) return;
             
             const question = quizQuestions[game.currentQuestionIndex];
-            const isCorrect = optionIndex === question.correct;
+            // optionIndex is the clicked DISPLAY position; map back to the real option index
+            // via the shuffled order set up in nextQuestion().
+            const optionOrder = game.currentOptionOrder || question.options.map((_, idx) => idx);
+            const realIndex = optionIndex >= 0 ? optionOrder[optionIndex] : optionIndex;
+            const correctDisplayIndex = optionOrder.indexOf(question.correct);
+            const isCorrect = realIndex === question.correct;
             const optionsDiv = document.getElementById('quizOptions');
             const options = optionsDiv.querySelectorAll('.quiz-option');
             
@@ -3062,8 +3069,8 @@
                     options[optionIndex].style.backgroundColor = 'rgba(231, 76, 60, 0.3)';
                     options[optionIndex].style.borderColor = 'var(--red-damage)';
                 }
-                options[question.correct].style.backgroundColor = 'rgba(46, 204, 113, 0.3)';
-                options[question.correct].style.borderColor = 'var(--green-success)';
+                options[correctDisplayIndex].style.backgroundColor = 'rgba(46, 204, 113, 0.3)';
+                options[correctDisplayIndex].style.borderColor = 'var(--green-success)';
             }
             
             if (isCorrect) {
@@ -3104,7 +3111,7 @@
 
         // ===== Permanent (cross-run) upgrade shop - now lives on the Game Over screen =====
         function getPermanentUpgradeBaseCost(upgradeType) {
-            return upgradeType === 'shieldGenerator' ? 200 : 50;
+            return upgradeType === 'extraLife' ? 200 : 50;
         }
 
         function getPermanentUpgradeCost(upgradeType) {
@@ -3118,7 +3125,7 @@
                 correctAnswerBoost: 0,
                 fireRateBoost: 0,
                 shipSpeed: 0,
-                shieldGenerator: 0,
+                extraLife: 0,
                 powerupSpawnRate: 0
             }, saved || {});
         }
@@ -3160,9 +3167,9 @@
                     name: 'Ship Speed',
                     description: 'Move 10% faster per level'
                 },
-                shieldGenerator: {
-                    name: 'Shield Generator',
-                    description: 'Start every run with 1 more permanent shield layer'
+                extraLife: {
+                    name: 'Extra Life',
+                    description: 'Start every run with 1 more life'
                 },
                 powerupSpawnRate: {
                     name: 'Powerup Spawn Rate',
@@ -3236,7 +3243,7 @@
                 extraDiv.appendChild(applyBtn);
             } else if (code === 'alien') {
                 game.skipQuizzes = true;
-                game.startingAmmo = 5000;
+                game.startingAmmo = 500;
                 game.secretCodeActive = true;
                 statusDiv.innerHTML = '✅ Quiz skip mode activated! Starting with 500 ammo!';
                 statusDiv.style.color = 'var(--green-success)';
@@ -3272,12 +3279,12 @@
             const savedCoins = parseInt(localStorage.getItem('coins') || '0');
             
             game.wave = game.secretCodeActive ? game.startingWave : 1;
-            game.baseLives = 10;
+            game.baseLives = 10 + game.permanentUpgrades.extraLife;
             game.lives = game.baseLives;
             game.score = 0;
             game.coins = savedCoins;
             game.ammo = game.secretCodeActive ? game.startingAmmo : 20;
-            game.shields = game.permanentUpgrades.shieldGenerator;
+            game.shields = 0;
             game.bullets = [];
             game.pendingBullets = [];
             game.enemyBullets = [];
@@ -3332,9 +3339,9 @@
             game.totalEnemiesDefeatedAllTime = savedTotalEnemiesDefeated;
             game.coins = savedCoins;
             game.score = 0;
-            game.baseLives = 10;
+            game.baseLives = 10 + game.permanentUpgrades.extraLife;
             game.lives = game.baseLives;
-            game.shields = game.permanentUpgrades.shieldGenerator;
+            game.shields = 0;
             game.runPowerups = {};
             
             if (game.secretCodeActive) {
@@ -3346,7 +3353,8 @@
             
             createStars();
             
-            gameLoop();
+            gameLoopToken++;
+            gameLoop(gameLoopToken);
             
             updateUI();
         }
@@ -3430,14 +3438,24 @@
             const optionsDiv = document.getElementById('quizOptions');
             optionsDiv.innerHTML = '';
             
-            question.options.forEach((option, index) => {
+            // Shuffle the display order of the answer options (Fisher-Yates) so the
+            // correct answer isn't always in the same position - students have to
+            // actually read and pick the right answer rather than memorize a slot.
+            const optionOrder = question.options.map((_, idx) => idx);
+            for (let i = optionOrder.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [optionOrder[i], optionOrder[j]] = [optionOrder[j], optionOrder[i]];
+            }
+            game.currentOptionOrder = optionOrder;
+            
+            optionOrder.forEach((originalIndex, displayIndex) => {
                 const optionDiv = document.createElement('div');
                 optionDiv.className = 'option quiz-option';
-                optionDiv.textContent = option;
+                optionDiv.textContent = question.options[originalIndex];
                 optionDiv.style.pointerEvents = 'auto';
                 optionDiv.style.backgroundColor = '';
                 optionDiv.style.borderColor = '';
-                optionDiv.onclick = () => answerQuiz(index);
+                optionDiv.onclick = () => answerQuiz(displayIndex);
                 optionsDiv.appendChild(optionDiv);
             });
             
@@ -3620,13 +3638,21 @@
             updateUI();
         }
 
-        function gameLoop() {
+        // Tracks which gameLoop "chain" is the current one. Each call to initializeGame()
+        // (i.e. each new run) bumps this token and starts a fresh loop; any older loop
+        // still in flight sees a stale token and quietly stops itself instead of
+        // continuing to run alongside the new one (which was doubling/tripling/etc.
+        // update() calls per frame and making the game speed up on every replay).
+        let gameLoopToken = 0;
+
+        function gameLoop(token) {
+            if (token !== gameLoopToken) return;
             if (game.state === GameState.PLAYING) {
                 update();
                 draw();
             }
             applyFrameTransform();
-            requestAnimationFrame(gameLoop);
+            requestAnimationFrame(() => gameLoop(token));
         }
 
         setInterval(() => {
@@ -3887,7 +3913,10 @@
             game.explosions.push(new Explosion(x, y, 'bomb'));
             
             const explosiveAmmoLevel = game.runPowerups.explosiveAmmo || 0;
-            const explosionRadius = 200 * (1 + 0.1 * explosiveAmmoLevel);
+            // Radius tuned to match the drawn 'bomb' explosion sprite (~75-80px), which
+            // was previously way smaller than the 200px hit radius - enemies well outside
+            // the visible blast were being destroyed.
+            const explosionRadius = 80 * (1 + 0.1 * explosiveAmmoLevel);
             
             for (let i = game.enemies.length - 1; i >= 0; i--) {
                 const enemy = game.enemies[i];
