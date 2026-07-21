@@ -694,21 +694,31 @@
         // to add a new subject - no other code changes needed.
         // Suggested naming: '<year><term><subject initial><extra letter>'
         // e.g. Year 9 Biology Term 3 full = '93bf', Year 9 Physics Speed = '92ps'.
+        //
+        // JSON FORMAT (must match across all games for consistency):
+        // A plain top-level array of question objects, each shaped like:
+        //   { "q": "question text", "o": ["option A", "option B", ...], "a": 0 }
+        // where "a" is the index (0-based) into "o" of the correct option.
         const QUESTION_BANK_FILES = {
             '93bf': 'question-banks/year-9-biology-full.json',
             '92ps': 'question-banks/year-9-physics-speed.json',
             '92pf': 'question-banks/year-9-physics-force.json',
-            '112cf': 'question-banks/year-11-chemisty-full.json',
-            '11-13dc': 'question-banks/seniordance-choreography.json',
+            '112cf': 'question-banks/year-11-chemistry-full.json',
+            '11-13dc': 'question-banks/senior-dance-choreography.json',
+            '11-13dg': 'question-banks/senior-dance-genres.json',
             'science': 'question-banks/year-9-science-full.json',
         };
 
+        // Question banks are a plain top-level array of { q, o, a } objects:
+        //   q = question text (string)
+        //   o = array of answer options (>= 2)
+        //   a = index into o of the correct answer
         function validateQuestionBank(data) {
-            if (!data || !Array.isArray(data.questions) || data.questions.length === 0) return false;
-            return data.questions.every(q =>
-                typeof q.question === 'string' &&
-                Array.isArray(q.options) && q.options.length >= 2 &&
-                Number.isInteger(q.correct) && q.correct >= 0 && q.correct < q.options.length
+            if (!Array.isArray(data) || data.length === 0) return false;
+            return data.every(item =>
+                typeof item.q === 'string' &&
+                Array.isArray(item.o) && item.o.length >= 2 &&
+                Number.isInteger(item.a) && item.a >= 0 && item.a < item.o.length
             );
         }
 
@@ -766,10 +776,15 @@
                     throw new Error('question bank JSON failed validation');
                 }
 
-                quizQuestions = data.questions;
-                const subjectName = data.subject || code.toUpperCase();
+                // Normalize { q, o, a } -> { question, options, correct } for the game engine.
+                quizQuestions = data.map(item => ({
+                    question: item.q,
+                    options: item.o,
+                    correct: item.a
+                }));
+                const subjectName = code.toUpperCase();
                 setActiveSubject(subjectName);
-                statusDiv.innerHTML = `✅ Loaded: <strong>${subjectName}</strong> (${data.questions.length} questions)`;
+                statusDiv.innerHTML = `✅ Loaded: <strong>${subjectName}</strong> (${quizQuestions.length} questions)`;
                 statusDiv.style.color = 'var(--green-success)';
                 localStorage.setItem('lastBankCode', code);
                 return true;

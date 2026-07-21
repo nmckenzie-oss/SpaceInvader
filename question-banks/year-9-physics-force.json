@@ -1,245 +1,132 @@
-{
-  "subject": "Physics",
-  "questions": [
-    {
-      "question": "What is the unit of force?",
-      "options": ["J", "N", "kg", "m/s"],
-      "correct": 1
-    },
-    {
-      "question": "Which equation relates force, mass, and acceleration?",
-      "options": [
-        "Force = Mass ÷ Acceleration",
-        "Force = Mass + Acceleration",
-        "Force = Mass × Acceleration",
-        "Force = Acceleration ÷ Mass"
-      ],
-      "correct": 2
-    },
-    {
-      "question": "What does the symbol F represent?",
-      "options": ["Frequency", "Fuel", "Force", "Friction"],
-      "correct": 2
-    },
-    {
-      "question": "What happens to an object's acceleration if the force acting on it increases but its mass stays the same?",
-      "options": ["It becomes zero.", "It decreases.", "It increases.", "It stays the same."],
-      "correct": 2
-    },
-    {
-      "question": "A shopping trolley has a mass of 20 kg. If it accelerates at 3 m/s², what force is applied?",
-      "options": ["600 N", "60 N", "23 N", "17 N"],
-      "correct": 1
-    },
-    {
-      "question": "If the same force is applied to two objects, which one accelerates more?",
-      "options": [
-        "Neither accelerates.",
-        "The object with the greater mass.",
-        "Both accelerate equally.",
-        "The object with the smaller mass."
-      ],
-      "correct": 3
-    },
-    {
-      "question": "What is the mass of an object if a force of 50 N causes it to accelerate at 5 m/s²?",
-      "options": ["25 kg", "250 kg", "10 kg", "55 kg"],
-      "correct": 2
-    },
-    {
-      "question": "A force of 80 N acts on a 20 kg object. What is its acceleration?",
-      "options": ["4 m/s²", "0.25 m/s²", "100 m/s²", "2 m/s²"],
-      "correct": 0
-    },
-    {
-      "question": "If the mass of an object doubles while the force stays the same, the acceleration will:",
-      "options": ["Stay the same.", "Halve.", "Double.", "Triple."],
-      "correct": 1
-    },
-    {
-      "question": "Which statement is true?",
-      "options": [
-        "More force causes greater acceleration if mass stays constant.",
-        "Force and mass are measured in the same units.",
-        "Acceleration is measured in Newtons.",
-        "Heavier objects always accelerate faster."
-      ],
-      "correct": 0
-    },
-    {
-      "question": "A force of 24 N is applied to a 6 kg object. What is the acceleration?",
-      "options": ["2 m/s²", "30 m/s²", "4 m/s²", "3 m/s²"],
-      "correct": 2
-    },
-    {
-      "question": "An object accelerates at 8 m/s² when a force of 40 N is applied. What is its mass?",
-      "options": ["48 kg", "8 kg", "5 kg", "32 kg"],
-      "correct": 2
-    },
-    {
-      "question": "Which of the following would require the greatest force to accelerate?",
-      "options": ["A 50 kg person", "A 500 g book", "A 5 kg backpack", "A 2 kg ball"],
-      "correct": 0
-    },
-    {
-      "question": "A 10 kg object experiences a force of 100 N. If the force is increased to 200 N, the acceleration becomes:",
-      "options": ["40 m/s²", "20 m/s²", "5 m/s²", "10 m/s²"],
-      "correct": 1
-    },
-    {
-      "question": "Which change would cause the greatest increase in acceleration?",
-      "options": [
-        "Doubling the mass.",
-        "Doubling the force.",
-        "Increasing both force and mass equally.",
-        "Halving the force."
-      ],
-      "correct": 1
-    },
-    {
-      "question": "A rugby player pushes with a force of 600 N on a scrum. If the opposing force is also 600 N, what is the acceleration?",
-      "options": ["Negative acceleration", "Cannot be determined", "Zero acceleration", "Positive acceleration"],
-      "correct": 2
-    },
-    {
-      "question": "A force of 90 N acts on a box with a mass of 30 kg. What is the acceleration?",
-      "options": ["27 m/s²", "1 m/s²", "3 m/s²", "2 m/s²"],
-      "correct": 2
-    },
-    {
-      "question": "A 12 kg object accelerates at 5 m/s². What is the applied force?",
-      "options": ["72 N", "17 N", "120 N", "60 N"],
-      "correct": 3
-    },
-    {
-      "question": "A car's engine provides a greater driving force while its mass stays constant. The car will:",
-      "options": ["Lose mass.", "Accelerate faster.", "Maintain constant speed.", "Slow down."],
-      "correct": 1
-    },
-    {
-      "question": "Two objects experience the same force. Object A has twice the mass of Object B. Compared with Object B, Object A will have:",
-      "options": [
-        "Four times the acceleration.",
-        "Half the acceleration.",
-        "The same acceleration.",
-        "Twice the acceleration."
-      ],
-      "correct": 1
-    },
-    {
-      "question": "Which quantity is measured in kilograms (kg)?",
-      "options": ["Force", "Acceleration", "Mass", "Speed"],
-      "correct": 2
-    },
-    {
-      "question": "What happens to acceleration if the force on an object is halved but the mass stays the same?",
-      "options": ["It doubles.", "It halves.", "It stays the same.", "It becomes zero."],
-      "correct": 1
-    },
-    {
-      "question": "A 4 kg object is pushed with a force of 20 N. What is its acceleration?",
-      "options": ["4 m/s²", "5 m/s²", "16 m/s²", "24 m/s²"],
-      "correct": 1
-    },
-    {
-      "question": "A force of 36 N produces an acceleration of 6 m/s². What is the object's mass?",
-      "options": ["12 kg", "42 kg", "6 kg", "30 kg"],
-      "correct": 2
-    },
-    {
-      "question": "Which object would need the least force to accelerate?",
-      "options": ["A 100 kg motorcycle", "A 2 kg football", "A 20 kg bicycle", "A 70 kg person"],
-      "correct": 1
-    },
-    {
-      "question": "Which statement about force is correct?",
-      "options": [
-        "Force can only slow objects down.",
-        "Force is measured in kilograms.",
-        "Force can change an object's motion.",
-        "Force is measured in metres."
-      ],
-      "correct": 2
-    },
-    {
-      "question": "A 15 kg object accelerates at 2 m/s². What force is applied?",
-      "options": ["17 N", "30 N", "13 N", "7.5 N"],
-      "correct": 1
-    },
-    {
-      "question": "A force of 72 N acts on a 9 kg object. What is its acceleration?",
-      "options": ["81 m/s²", "9 m/s²", "8 m/s²", "7 m/s²"],
-      "correct": 2
-    },
-    {
-      "question": "If an object's mass is reduced while the same force is applied, the acceleration will:",
-      "options": ["Increase.", "Stay the same.", "Decrease.", "Become zero."],
-      "correct": 0
-    },
-    {
-      "question": "Which of these is an example of a force?",
-      "options": ["Mass", "Weight", "Speed", "Distance"],
-      "correct": 1
-    },
-    {
-      "question": "A force of 45 N acts on an object with a mass of 15 kg. What is its acceleration?",
-      "options": ["60 m/s²", "30 m/s²", "3 m/s²", "15 m/s²"],
-      "correct": 2
-    },
-    {
-      "question": "A 5 kg object accelerates at 6 m/s². What force is acting on it?",
-      "options": ["30 N", "11 N", "1.2 N", "35 N"],
-      "correct": 0
-    },
-    {
-      "question": "Which variable is measured in m/s²?",
-      "options": ["Force", "Speed", "Acceleration", "Mass"],
-      "correct": 2
-    },
-    {
-      "question": "If both force and mass are doubled, the acceleration will:",
-      "options": ["Double.", "Stay the same.", "Halve.", "Become zero."],
-      "correct": 1
-    },
-    {
-      "question": "A truck has a much greater mass than a bicycle. If both experience the same force, the truck will:",
-      "options": [
-        "Accelerate more quickly.",
-        "Accelerate more slowly.",
-        "Accelerate at the same rate.",
-        "Stop immediately."
-      ],
-      "correct": 1
-    },
-    {
-      "question": "A force of 56 N causes an object to accelerate at 7 m/s². What is its mass?",
-      "options": ["8 kg", "49 kg", "63 kg", "14 kg"],
-      "correct": 0
-    },
-    {
-      "question": "A 25 kg object accelerates at 4 m/s². What is the force?",
-      "options": ["21 N", "100 N", "29 N", "6.25 N"],
-      "correct": 1
-    },
-    {
-      "question": "Which situation shows the greatest acceleration?",
-      "options": [
-        "20 N acting on 10 kg",
-        "40 N acting on 20 kg",
-        "30 N acting on 5 kg",
-        "50 N acting on 25 kg"
-      ],
-      "correct": 2
-    },
-    {
-      "question": "If no net force acts on an object, it will:",
-      "options": ["Always stop moving.", "Always speed up.", "Maintain its current motion.", "Accelerate rapidly."],
-      "correct": 2
-    },
-    {
-      "question": "A force of 18 N is applied to a 3 kg object. What is the acceleration?",
-      "options": ["54 m/s²", "15 m/s²", "6 m/s²", "9 m/s²"],
-      "correct": 2
-    }
-  ]
-}
+[
+  {
+    "q": "What is the unit of force?",
+    "o": ["J", "N", "kg", "m/s"],
+    "a": 1
+  },
+  {
+    "q": "Which equation relates force, mass, and acceleration?",
+    "o": [
+      "Force = Mass ÷ Acceleration",
+      "Force = Mass + Acceleration",
+      "Force = Mass × Acceleration",
+      "Force = Acceleration ÷ Mass"
+    ],
+    "a": 2
+  },
+  {
+    "q": "What does the symbol F represent?",
+    "o": ["Frequency", "Fuel", "Force", "Friction"],
+    "a": 2
+  },
+  {
+    "q": "What happens to an object's acceleration if the force acting on it increases but its mass stays the same?",
+    "o": ["It becomes zero.", "It decreases.", "It increases.", "It stays the same."],
+    "a": 2
+  },
+  {
+    "q": "A shopping trolley has a mass of 20 kg. If it accelerates at 3 m/s², what force is applied?",
+    "o": ["600 N", "60 N", "23 N", "17 N"],
+    "a": 1
+  },
+  {
+    "q": "If the same force is applied to two objects, which one accelerates more?",
+    "o": [
+      "Neither accelerates.",
+      "The object with the greater mass.",
+      "Both accelerate equally.",
+      "The object with the smaller mass."
+    ],
+    "a": 3
+  },
+  {
+    "q": "What is the mass of an object if a force of 50 N causes it to accelerate at 5 m/s²?",
+    "o": ["25 kg", "250 kg", "10 kg", "55 kg"],
+    "a": 2
+  },
+  {
+    "q": "A force of 80 N acts on a 20 kg object. What is its acceleration?",
+    "o": ["4 m/s²", "0.25 m/s²", "100 m/s²", "2 m/s²"],
+    "a": 0
+  },
+  {
+    "q": "If the mass of an object doubles while the force stays the same, the acceleration will:",
+    "o": ["Stay the same.", "Halve.", "Double.", "Triple."],
+    "a": 1
+  },
+  {
+    "q": "Which statement is true?",
+    "o": [
+      "More force causes greater acceleration if mass stays constant.",
+      "Force and mass are measured in the same units.",
+      "Acceleration is measured in Newtons.",
+      "Heavier objects always accelerate faster."
+    ],
+    "a": 0
+  },
+  {
+    "q": "A force of 24 N is applied to a 6 kg object. What is the acceleration?",
+    "o": ["2 m/s²", "30 m/s²", "4 m/s²", "3 m/s²"],
+    "a": 2
+  },
+  {
+    "q": "An object accelerates at 8 m/s² when a force of 40 N is applied. What is its mass?",
+    "o": ["48 kg", "8 kg", "5 kg", "32 kg"],
+    "a": 2
+  },
+  {
+    "q": "Which of the following would require the greatest force to accelerate?",
+    "o": ["A 50 kg person", "A 500 g book", "A 5 kg backpack", "A 2 kg ball"],
+    "a": 0
+  },
+  {
+    "q": "A 10 kg object experiences a force of 100 N. If the force is increased to 200 N, the acceleration becomes:",
+    "o": ["40 m/s²", "20 m/s²", "5 m/s²", "10 m/s²"],
+    "a": 1
+  },
+  {
+    "q": "Which change would cause the greatest increase in acceleration?",
+    "o": [
+      "Doubling the mass.",
+      "Doubling the force.",
+      "Increasing both force and mass equally.",
+      "Halving the force."
+    ],
+    "a": 1
+  },
+  {
+    "q": "A rugby player pushes with a force of 600 N on a scrum. If the opposing force is also 600 N, what is the acceleration?",
+    "o": [
+      "Negative acceleration",
+      "Cannot be determined",
+      "Zero acceleration",
+      "Positive acceleration"
+    ],
+    "a": 2
+  },
+  {
+    "q": "A force of 90 N acts on a box with a mass of 30 kg. What is the acceleration?",
+    "o": ["27 m/s²", "1 m/s²", "3 m/s²", "2 m/s²"],
+    "a": 2
+  },
+  {
+    "q": "A 12 kg object accelerates at 5 m/s². What is the applied force?",
+    "o": ["72 N", "17 N", "120 N", "60 N"],
+    "a": 3
+  },
+  {
+    "q": "A car's engine provides a greater driving force while its mass stays constant. The car will:",
+    "o": ["Lose mass.", "Accelerate faster.", "Maintain constant speed.", "Slow down."],
+    "a": 1
+  },
+  {
+    "q": "Two objects experience the same force. Object A has twice the mass of Object B. Compared with Object B, Object A will have:",
+    "o": [
+      "Four times the acceleration.",
+      "Half the acceleration.",
+      "The same acceleration.",
+      "Twice the acceleration."
+    ],
+    "a": 1
+  }
+]
