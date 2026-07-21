@@ -514,8 +514,8 @@
     <div id="quizResult" style="margin-top: 20px;"></div>
    </div>
    <div id="powerupSelect" class="modal">
-    <h2 style="color: var(--green-success);">⚡ CHOOSE A POWER-UP</h2>
-    <p style="color: #cccccc; margin: 0 0 10px 0;">This power-up lasts for the rest of this run only.</p>
+    <h2 id="powerupSelectTitle" style="color: var(--green-success);">⚡ CHOOSE A POWER-UP</h2>
+    <p id="powerupSelectSubtitle" style="color: #cccccc; margin: 0 0 10px 0;">This power-up lasts for the rest of this run only.</p>
     <div id="powerupSelectOptions" style="max-height: 420px; overflow-y: auto;"></div>
    </div>
    <div id="gameOver" class="modal">
@@ -625,6 +625,25 @@
             currentQuestionIndex: -1,
             isBonusQuiz: false,
             bonusCorrectCount: 0,
+
+            // Adaptive difficulty: each question starts at weight 1. Wrong answers
+            // double a question's weight (more likely to reappear, capped at 16);
+            // correct answers halve it (less likely to reappear, floor of 0.1).
+            // Indexed the same way as quizQuestions.
+            questionWeights: [],
+
+            // Perfect-quiz bonus: 4 correct answers in a row within a single
+            // (non-bonus) quiz grants a random run bonus.
+            quizCorrectStreak: 0,
+            quizPerfectBonusAwarded: false,
+
+            // Run-wide multipliers granted by the perfect-quiz bonus.
+            quizBonusSpeedMult: 1,
+            quizBonusFireRateMult: 1,
+
+            // Whether the player has already received the free starter power-up
+            // granted after finishing the very first quiz of a run.
+            firstQuizAwarded: false,
             
             // Permanent (cross-run) upgrades - bought with coins on the Game Over screen
             permanentUpgrades: {
@@ -782,6 +801,8 @@
                     options: item.o,
                     correct: item.a
                 }));
+                // Reset adaptive weighting - every question starts equally likely.
+                game.questionWeights = quizQuestions.map(() => 1);
                 const subjectName = code.toUpperCase();
                 setActiveSubject(subjectName);
                 statusDiv.innerHTML = `✅ Loaded: <strong>${subjectName}</strong> (${quizQuestions.length} questions)`;
@@ -857,7 +878,7 @@
             get speed() {
                 const thrusterLevel = game.runPowerups.strongerThrusters || 0;
                 const shipSpeedMultiplier = 1 + (game.permanentUpgrades.shipSpeed * 0.1);
-                return game.baseSpeed * shipSpeedMultiplier * (1 + thrusterLevel * 0.1);
+                return game.baseSpeed * shipSpeedMultiplier * (1 + thrusterLevel * 0.1) * game.quizBonusSpeedMult;
             }
 
             update() {
@@ -898,6 +919,9 @@
                 // Faster Shot run power-up
                 const fasterShotLevel = game.runPowerups.fasterShot || 0;
                 currentFireRate *= Math.pow(0.9, fasterShotLevel);
+                
+                // Perfect-quiz bonus fire rate
+                currentFireRate *= game.quizBonusFireRateMult;
                 
                 // Rapid fire powerup: 3x fire rate
                 if (game.rapidFireActive) {
@@ -3090,6 +3114,15 @@
                 options[correctDisplayIndex].style.borderColor = 'var(--green-success)';
             }
             
+            // Adaptive difficulty: correct answers make a question rarer (half its
+            // weight, floor 0.1), wrong answers make it more likely to reappear
+            // (double its weight, cap 16) so struggling students see it again sooner.
+            const weightedIndex = game.currentQuestionIndex;
+            const currentWeight = game.questionWeights[weightedIndex] ?? 1;
+            game.questionWeights[weightedIndex] = isCorrect
+                ? Math.max(0.1, currentWeight / 2)
+                : Math.min(16, currentWeight * 2);
+            
             if (isCorrect) {
                 const ammoGenLevel = game.runPowerups.ammoGeneration || 0;
                 let ammoGain = game.baseAmmoPerCorrect + game.permanentUpgrades.correctAnswerBoost + (ammoGenLevel * 10);
@@ -3098,7 +3131,16 @@
                 game.score += 10;
                 
                 if (game.isBonusQuiz) game.bonusCorrectCount++;
+                
+                // Item: 4 correct answers in a row within a normal quiz earns a
+                // random bonus (doesn't stack with the separate boss bonus-quiz reward).
+                game.quizCorrectStreak++;
+                if (!game.isBonusQuiz && !game.quizPerfectBonusAwarded && game.quizCorrectStreak >= 4) {
+                    game.quizPerfectBonusAwarded = true;
+                    awardPerfectQuizBonus();
+                }
             } else {
+                game.quizCorrectStreak = 0;
                 if (game.shields > 0) {
                     game.shields--;
                 } else {
@@ -3124,6 +3166,28 @@
                     nextQuestion();
                 }
             }, 200);
+        }
+
+        // Awarded the moment a student answers 4 questions in a row correctly within
+        // a single (non-bonus) quiz. Picks one random bonus and applies it immediately.
+        function awardPerfectQuizBonus() {
+            const bonusOptions = [
+                { label: '+10 Ammo', apply: () => { game.ammo += 10; } },
+                { label: '+5% Fire Rate', apply: () => { game.quizBonusFireRateMult *= 0.95; } },
+                { label: '+5% Movement Speed', apply: () => { game.quizBonusSpeedMult *= 1.05; } },
+                { label: '+1 Health', apply: () => { game.lives += 1; } }
+            ];
+            const choice = bonusOptions[Math.floor(Math.random() * bonusOptions.length)];
+            choice.apply();
+            updateUI();
+            
+            const resultDiv = document.getElementById('quizResult');
+            if (resultDiv) {
+                resultDiv.innerHTML = `🎉 <strong style="color: var(--green-success);">Perfect streak bonus!</strong> ${choice.label}`;
+                setTimeout(() => {
+                    if (resultDiv.innerHTML.includes(choice.label)) resultDiv.innerHTML = '';
+                }, 2500);
+            }
         }
 
         // ===== Permanent (cross-run) upgrade shop - now lives on the Game Over screen =====
@@ -3319,6 +3383,11 @@
             game.shotsFiredThisRun = 0;
             game.totalEnemiesDefeatedAllTime = savedTotalEnemiesDefeated;
             game.runPowerups = {};
+            game.quizBonusSpeedMult = 1;
+            game.quizBonusFireRateMult = 1;
+            game.quizCorrectStreak = 0;
+            game.quizPerfectBonusAwarded = false;
+            game.firstQuizAwarded = false;
             
             game.secretCodeActive = false;
             game.startingWave = 1;
@@ -3360,6 +3429,11 @@
             game.lives = game.baseLives;
             game.shields = 0;
             game.runPowerups = {};
+            game.quizBonusSpeedMult = 1;
+            game.quizBonusFireRateMult = 1;
+            game.quizCorrectStreak = 0;
+            game.quizPerfectBonusAwarded = false;
+            game.firstQuizAwarded = false;
             
             if (game.secretCodeActive) {
                 game.wave = game.startingWave;
@@ -3403,6 +3477,8 @@
             game.state = GameState.QUIZ;
             game.questionsAnswered = 0;
             game.usedQuestions = [];
+            game.quizCorrectStreak = 0;
+            game.quizPerfectBonusAwarded = false;
             
             if (game.difficulty === 'easy') {
                 game.totalQuestionsThisQuiz = 4;
@@ -3429,22 +3505,41 @@
             game.questionsAnswered = 0;
             game.usedQuestions = [];
             game.totalQuestionsThisQuiz = 4;
+            game.quizCorrectStreak = 0;
+            game.quizPerfectBonusAwarded = false;
             
             document.getElementById('quizTitleText').textContent = '🏆 BONUS: ' + (currentSubjectName ? currentSubjectName.toUpperCase() : '');
             document.getElementById('quiz').style.display = 'block';
             nextQuestion();
         }
 
+        // Picks a random index out of `indices`, weighted by game.questionWeights.
+        // Questions the student has recently gotten wrong carry a higher weight
+        // (up to 16x) and so are more likely to be picked; questions they've
+        // nailed carry a lower weight (down to 0.1x) and become rarer.
+        function weightedRandomIndex(indices) {
+            const weights = indices.map(i => game.questionWeights[i] ?? 1);
+            const total = weights.reduce((sum, w) => sum + w, 0);
+            if (total <= 0) return indices[Math.floor(Math.random() * indices.length)];
+            let roll = Math.random() * total;
+            for (let i = 0; i < indices.length; i++) {
+                roll -= weights[i];
+                if (roll <= 0) return indices[i];
+            }
+            return indices[indices.length - 1];
+        }
+
         function nextQuestion() {
-            let availableQuestions = quizQuestions.filter((_, index) => !game.usedQuestions.includes(index));
+            let availableIndices = quizQuestions
+                .map((_, index) => index)
+                .filter(index => !game.usedQuestions.includes(index));
             
-            if (availableQuestions.length === 0) {
+            if (availableIndices.length === 0) {
                 game.usedQuestions = [];
-                availableQuestions = quizQuestions;
+                availableIndices = quizQuestions.map((_, index) => index);
             }
             
-            const randomIndex = Math.floor(Math.random() * availableQuestions.length);
-            const questionIndex = quizQuestions.indexOf(availableQuestions[randomIndex]);
+            const questionIndex = weightedRandomIndex(availableIndices);
             game.usedQuestions.push(questionIndex);
             game.currentQuestionIndex = questionIndex;
             
@@ -3507,14 +3602,31 @@
             hideAllModals();
             if (game.isBonusQuiz) {
                 showBonusPowerupSelect(game.bonusCorrectCount);
+            } else if (!game.firstQuizAwarded) {
+                // Item: give a free random power-up choice right after the very
+                // first quiz of the run, before wave 1 begins.
+                game.firstQuizAwarded = true;
+                showBonusPowerupSelect(1, true);
             } else {
                 startWave();
             }
         }
 
         // Presents `count` random, unique power-up options; the player picks exactly one.
-        function showBonusPowerupSelect(count) {
+        // When isFreeStarter is true, the modal text is tweaked to explain that this
+        // one is a free gift for finishing their first quiz (not earned via a boss fight).
+        function showBonusPowerupSelect(count, isFreeStarter) {
             game.isBonusQuiz = false;
+            
+            const titleEl = document.getElementById('powerupSelectTitle');
+            const subtitleEl = document.getElementById('powerupSelectSubtitle');
+            if (isFreeStarter) {
+                if (titleEl) titleEl.textContent = '🎁 FREE STARTER POWER-UP!';
+                if (subtitleEl) subtitleEl.textContent = 'A free gift for finishing your first quiz. This power-up lasts for the rest of this run.';
+            } else {
+                if (titleEl) titleEl.textContent = '⚡ CHOOSE A POWER-UP';
+                if (subtitleEl) subtitleEl.textContent = 'This power-up lasts for the rest of this run only.';
+            }
             
             if (count <= 0) {
                 startWave();
