@@ -495,7 +495,7 @@
      <p><strong>Goal:</strong> Answer quiz questions to get ammo, then fight aliens!</p>
      <h3>🌊 GAME FLOW</h3>
      <p>Quiz → Fight Aliens → Quiz → Fight → Quiz → Boss Fight...</p>
-     <p>Defeat a boss to trigger 4 bonus questions — answer them correctly to unlock a run-only power-up choice!</p>
+     <p>Answer quiz questions correctly to unlock or upgrade power-ups. Defeat a boss for a free upgrade to a power-up of your choice!</p>
      <h3>🧠 QUIZ SYSTEM</h3>
      <p><strong>Correct answers = +10 Ammo</strong> • No ammo = no shooting!</p>
      <h3>🪙 COINS & UPGRADES</h3>
@@ -623,8 +623,6 @@
             totalQuestionsThisQuiz: 0,
             usedQuestions: [],
             currentQuestionIndex: -1,
-            isBonusQuiz: false,
-            bonusCorrectCount: 0,
 
             // Adaptive difficulty: each question starts at weight 1. Wrong answers
             // double a question's weight (more likely to reappear, capped at 16);
@@ -632,17 +630,13 @@
             // Indexed the same way as quizQuestions.
             questionWeights: [],
 
-            // Perfect-quiz bonus: 4 correct answers in a row within a single
-            // (non-bonus) quiz grants a random run bonus.
-            quizCorrectStreak: 0,
-            quizPerfectBonusAwarded: false,
-
-            // Run-wide multipliers granted by the perfect-quiz bonus.
-            quizBonusSpeedMult: 1,
-            quizBonusFireRateMult: 1,
+            // Number of questions answered correctly in the current quiz. After the
+            // quiz ends, the player gets to choose 1 power-up out of this many random
+            // options (upgrading it if they already own it).
+            quizCorrectCount: 0,
 
             // Whether the player has already received the free starter power-up
-            // granted after finishing the very first quiz of a run.
+            // guarantee after finishing the very first quiz of a run.
             firstQuizAwarded: false,
             
             // Permanent (cross-run) upgrades - bought with coins on the Game Over screen
@@ -726,6 +720,7 @@
             '11-13dc': 'question-banks/senior-dance-choreography.json',
             '11-13dg': 'question-banks/senior-dance-genres.json',
             'science': 'question-banks/year-9-science-full.json',
+            'cooking':'question-banks/cooking.json',
         };
 
         // Question banks are a plain top-level array of { q, o, a } objects:
@@ -878,7 +873,7 @@
             get speed() {
                 const thrusterLevel = game.runPowerups.strongerThrusters || 0;
                 const shipSpeedMultiplier = 1 + (game.permanentUpgrades.shipSpeed * 0.1);
-                return game.baseSpeed * shipSpeedMultiplier * (1 + thrusterLevel * 0.1) * game.quizBonusSpeedMult;
+                return game.baseSpeed * shipSpeedMultiplier * (1 + thrusterLevel * 0.1);
             }
 
             update() {
@@ -920,8 +915,10 @@
                 const fasterShotLevel = game.runPowerups.fasterShot || 0;
                 currentFireRate *= Math.pow(0.9, fasterShotLevel);
                 
-                // Perfect-quiz bonus fire rate
-                currentFireRate *= game.quizBonusFireRateMult;
+                // Laser Shot fires 20% slower to balance its piercing beam
+                if ((game.runPowerups.laserShot || 0) > 0) {
+                    currentFireRate *= 1.2;
+                }
                 
                 // Rapid fire powerup: 3x fire rate
                 if (game.rapidFireActive) {
@@ -1414,7 +1411,8 @@
                                 this.lastShot = Date.now();
                                 this.fireRate = Math.max(500, 2000 - abilitySpeedBoost);
                                 this.lastTeleport = Date.now();
-                                this.teleportRate = Math.max(2000, 10000 - abilitySpeedBoost);
+                                // Teleports 50% more often (interval divided by 1.5)
+                                this.teleportRate = Math.max(1333, Math.floor((10000 - abilitySpeedBoost) / 1.5));
                                 break;
                             case 2:
                                 this.speed = 1 + (game.wave * 0.2);
@@ -1433,9 +1431,11 @@
                             case 3:
                                 this.speed = 1 + (game.wave * 0.2);
                                 this.minions = [];
-                                for (let i = 0; i < 2; i++) {
+                                const minionCount = Math.max(1, Math.floor((game.wave * 2) / 5));
+                                for (let i = 0; i < minionCount; i++) {
+                                    const minionOffset = (i - (minionCount - 1) / 2) * 50;
                                     this.minions.push({
-                                        x: this.x + (i === 0 ? -60 : 60),
+                                        x: this.x + minionOffset,
                                         y: this.y + 20,
                                         width: 24,
                                         height: 16,
@@ -1499,12 +1499,16 @@
                         
                         if (!this.lastSpawn) this.lastSpawn = now;
                         if (now - this.lastSpawn > this.spawnRate) {
-                            const spawnLeft = Math.random() > 0.5;
-                            const spawnX = this.x + (spawnLeft ? -15 : this.width + 5);
-                            const spawnY = this.y + this.height / 2;
-                            const miniAlien = new Enemy(spawnX, spawnY, 'normal', 0, null, true);
-                            miniAlien.deployed = true;
-                            game.enemies.push(miniAlien);
+                            const spawnCount = Math.max(1, Math.floor(game.wave / 5));
+                            for (let i = 0; i < spawnCount; i++) {
+                                const spawnLeft = i % 2 === 0;
+                                const spreadOffset = Math.floor(i / 2) * 12;
+                                const spawnX = this.x + (spawnLeft ? -15 - spreadOffset : this.width + 5 + spreadOffset);
+                                const spawnY = this.y + this.height / 2;
+                                const miniAlien = new Enemy(spawnX, spawnY, 'normal', 0, null, true);
+                                miniAlien.deployed = true;
+                                game.enemies.push(miniAlien);
+                            }
                             this.lastSpawn = now;
                         }
                         break;
@@ -1520,7 +1524,9 @@
                             game.enemyBullets.push(new EnemyBullet(
                                 this.x + this.width/2, 
                                 this.y + this.height, 
-                                'spider'
+                                'spider',
+                                game.player.x + game.player.width/2,
+                                game.player.y + game.player.height/2
                             ));
                             this.lastShot = now;
                         }
@@ -1587,7 +1593,8 @@
                         }
                         
                         this.minions.forEach((minion, index) => {
-                            minion.x = this.x + (index === 0 ? -60 : 60);
+                            const minionOffset = (index - (this.minions.length - 1) / 2) * 50;
+                            minion.x = this.x + minionOffset;
                             minion.y = this.y + 20;
                             
                             if (now - minion.targetTime > 1000) {
@@ -1624,172 +1631,301 @@
                         {
                             patterns: [
                                 [
-                                    '      BBBBBBBB      ',
-                                    '    BBBBBBBBBBBB    ',
-                                    '   BBBBBBBBBBBBBB   ',
-                                    '  BBBBBBBBBBBBBBBB  ',
-                                    ' BBBBBBBBBBBBBBBBBB ',
-                                    'BBBBBBBBBBBBBBBBBBBB',
-                                    'BBRRBBBBBBBBBBBBRRBB',
-                                    'BBRRBBBBB##BBBBBRRBB',
-                                    'BBRRBBBB####BBBBRRBB',
-                                    'BBBBBBBB####BBBBBBBB',
-                                    'BBRRBBBB####BBBBRRBB',
-                                    'BBRRBBBBB##BBBBBRRBB',
-                                    'BBRRBBBBBBBBBBBBRRBB',
-                                    'BBBBBBBBBBBBBBBBBBBB',
-                                    ' BBBBBBBBBBBBBBBBBB ',
-                                    '  BBBBBBBBBBBBBBBB  '
+                                    '                                                ',
+                                    '                                                ',
+                                    '                  RRRRRRRRRRRR                  ',
+                                    '              RRRRRRRRRRRRRRRRRRRR              ',
+                                    '           RRRRRRRRBBBBBBBBBBRRRRRRRR           ',
+                                    '         RRRRRRBBBBBBBBBBBBBBBBBBRRRRRR         ',
+                                    '        RRRRRBBBBBBBBBBBBBBBBBBBBBBRRRRR        ',
+                                    '       RRRRBBBBBBBBBBBBBBBBBBBBBBBBBBRRRR       ',
+                                    '     RRRRRBBBBBBBBBBBBBBBBBBBBBBBBBBBBRRRRR     ',
+                                    '     RRRBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBRRR     ',
+                                    '    RRRBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBRRR    ',
+                                    '   RRRRBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBRRRR   ',
+                                    '   RRRBBBBBBBBBBBBBBBB####BBBBBBBBBBBBBBBBRRR   ',
+                                    '  EEEEEEBBBBBBBBBBBBBB####BBBBBBBBBBBBBBEEEEEE  ',
+                                    'EEEEEEEEEEBBBBBBBBB##########BBBBBBBBBEEEEEEEEEE',
+                                    'EEEEEEEEEEBBBBBBBBB##########BBBBBBBBBEEEEEEEEEE',
+                                    'EEEEEEEEEEEBBBBBBBB##########BBBBBBBBEEEEEEEEEEE',
+                                    'EEEGGGGEEEEBBBBBBBB##########BBBBBBBBEEEEGGGGEEE',
+                                    'EEEGGGGEEEEBBBBBBBBBBB####BBBBBBBBBBBEEEEGGGGEEE',
+                                    'EEEGGGGEEEEBBBBBBBBBBB####BBBBBBBBBBBEEEEGGGGEEE',
+                                    'EEEGGGGEEEEBBBBBBBBBBBBBBBBBBBBBBBBBBEEEEGGGGEEE',
+                                    'EEEEEEEEEEEBBBBBBBBBBBBBBBBBBBBBBBBBBEEEEEEEEEEE',
+                                    'EEEEEEEEEEBBBBBBBBBBBBBBBBBBBBBBBBBBBBEEEEEEEEEE',
+                                    'EEEEEEEEEEBBBBBBBBBBBBBBBBBBBBBBBBBBBBEEEEEEEEEE',
+                                    '  EEEEEERRRBBBBBBBBBBBBBBBBBBBBBBBBBBRRREEEEEE  ',
+                                    '        RRRRRBBBBBBBBBBBBBBBBBBBBBBRRRRR        ',
+                                    '         RRRRRRBBBBBBBBBBBBBBBBBBRRRRRR         ',
+                                    '           RRRRRRRRBBBBBBBBBBRRRRRRRR           ',
+                                    '              RRRRRRRRRRRRRRRRRRRR              ',
+                                    '                  RRRRRRRRRRRR                  ',
+                                    '                                                ',
+                                    '                                                '
                                 ],
                                 [
-                                    '      BBBBBBBB      ',
-                                    '    BBBBBBBBBBBB    ',
-                                    '   BBBBBBBBBBBBBB   ',
-                                    '  BBBBBBBBBBBBBBBB  ',
-                                    ' BBBBBBBBBBBBBBBBBB ',
-                                    'BBBBBBBBBBBBBBBBBBBB',
-                                    'BBRRBBBBBBBBBBBBRRBB',
-                                    'BBRRBBBBB##BBBBBRRBB',
-                                    'BBRRBBBB##BBBBBBRRBB',
-                                    'BBBBBBBB##BBBBBBBBBB',
-                                    'BBRRBBBB##BBBBBBRRBB',
-                                    'BBRRBBBBB##BBBBBRRBB',
-                                    'BBRRBBBBBBBBBBBBRRBB',
-                                    'BBBBBBBBBBBBBBBBBBBB',
-                                    ' BBBBBBBBBBBBBBBBBB ',
-                                    '  BBBBBBBBBBBBBBBB  '
+                                    '                                                ',
+                                    '                                                ',
+                                    '                  RRRRRRRRRRRR                  ',
+                                    '              RRRRRRRRRRRRRRRRRRRR              ',
+                                    '           RRRRRRRRBBBBBBBBBBRRRRRRRR           ',
+                                    '         RRRRRRBBBBBBBBBBBBBBBBBBRRRRRR         ',
+                                    '        RRRRRBBBBBBBBBBBBBBBBBBBBBBRRRRR        ',
+                                    '       RRRRBBBBBBBBBBBBBBBBBBBBBBBBBBRRRR       ',
+                                    '     RRRRRBBBBBBBBBBBBBBBBBBBBBBBBBBBBRRRRR     ',
+                                    '     RRRBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBRRR     ',
+                                    '    RRRBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBRRR    ',
+                                    '   RRRRBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBRRRR   ',
+                                    '  EEEEEEBBBBBBBBBBBBBB####BBBBBBBBBBBBBBEEEEEE  ',
+                                    'EEEEEEEEEEBBBBBBBBBBBB####BBBBBBBBBBBBEEEEEEEEEE',
+                                    'EEEEEEEEEEEBBBBBBBBBBB####BBBBBBBBBBBEEEEEEEEEEE',
+                                    'EEEEEEEEEEEBBBBBBBB##########BBBBBBBBEEEEEEEEEEE',
+                                    'EEEEEEEEEEEEBBBBBBB##########BBBBBBBEEEEEEEEEEEE',
+                                    'EEEGGGGEEEEEBBBBBBBBBB####BBBBBBBBBBEEEEEGGGGEEE',
+                                    'EEEGGGGEEEEEBBBBBBBBBB####BBBBBBBBBBEEEEEGGGGEEE',
+                                    'EEEGGGGEEEEEBBBBBBBBBB####BBBBBBBBBBEEEEEGGGGEEE',
+                                    'EEEGGGGEEEEEBBBBBBBBBBBBBBBBBBBBBBBBEEEEEGGGGEEE',
+                                    'EEEEEEEEEEEEBBBBBBBBBBBBBBBBBBBBBBBBEEEEEEEEEEEE',
+                                    'EEEEEEEEEEEBBBBBBBBBBBBBBBBBBBBBBBBBBEEEEEEEEEEE',
+                                    'EEEEEEEEEEEBBBBBBBBBBBBBBBBBBBBBBBBBBEEEEEEEEEEE',
+                                    'EEEEEEEEEERBBBBBBBBBBBBBBBBBBBBBBBBBBREEEEEEEEEE',
+                                    '  EEEEEERRRRRBBBBBBBBBBBBBBBBBBBBBBRRRRREEEEEE  ',
+                                    '         RRRRRRBBBBBBBBBBBBBBBBBBRRRRRR         ',
+                                    '           RRRRRRRRBBBBBBBBBBRRRRRRRR           ',
+                                    '              RRRRRRRRRRRRRRRRRRRR              ',
+                                    '                  RRRRRRRRRRRR                  ',
+                                    '                                                ',
+                                    '                                                '
                                 ]
                             ],
-                            colors: { 'B': '#cc0000', 'R': '#ff4444', '#': '#000000' }
+                            colors: { 'B': '#aa1100', 'R': '#ff3300', 'E': '#66cc00', 'G': '#ffff33', '#': '#000000' }
                         },
                         {
                             patterns: [
                                 [
-                                    'RR    BBBBBB    RR  ',
-                                    ' RR  BBBBBBBB  RR   ',
-                                    '  RR BBBBBBBB RR    ',
-                                    '   RRBBBBBBBBR      ',
-                                    '    BBBBBBBBBB      ',
-                                    '   BBBB####BBBB     ',
-                                    '  BBB######BBB      ',
-                                    ' BBB########BBB     ',
-                                    'BBB##########BBB    ',
-                                    'BBB##########BBB    ',
-                                    ' BBB########BBB     ',
-                                    '  BBB######BBB      ',
-                                    '   BBBB####BBBB     ',
-                                    '    BBBBBBBBBB      ',
-                                    '   RR BBBBBB RR     ',
-                                    'RR     BBBB     RR  '
+                                    '                                                ',
+                                    '                                                ',
+                                    '                RRRRRRRRRRRRRRRR                ',
+                                    '            RRRRRRRRRRRRRRRRRRRRRRRR            ',
+                                    '         RRRRRRRRBBBBBBBBBBBBBBRRRRRRRR         ',
+                                    '        RRRRRBBBBBBBBBBBBBBBBBBBBBBRRRRR        ',
+                                    '      RRRRRBBBBBBBBBBBBBBBBBBBBBBBBBBRRRRR      ',
+                                    '     RRRRRBBBBBBBBBBBBBBBBBBBBBBBBBBBBRRRRR     ',
+                                    '     RRRRBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBRRRR     ',
+                                    '    RRRRBBBBBBBBBBBBPPPPPPPPBBBBBBBBBBBBRRRR    ',
+                                    '    RRRBBBBBBBBBBBPPPBBBBBBPPPBBBBBBBBBBBRRR    ',
+                                    '   RRRRBBBBBBBBBPPBBBBBBBBBBBBPPBBBBBBBBBRRRR   ',
+                                    '   RRRBBBBBBBBBPPBBBBB####BBBBBPPBBBBBBBBBRRR   ',
+                                    '   RRRBBBBBBBBPPBBBBBB####BBBBBBPPBBBBBBBBRRR   ',
+                                    '   RRRBBBBBBBBPBBBB##########BBBBPBBBBBBBBRRR   ',
+                                    '   RRRBBBBBBBBPBBBB##########BBBBPBBBBBBBBRRR   ',
+                                    '   RRRBBBBBBBBPBBBB##########BBBBPBBBBBBBBRRR   ',
+                                    '   RRRBBBBBBBBPBBBB##########BBBBPBBBBBBBBRRR   ',
+                                    '   RRRBBBBBBBBPPBBBBBB####BBBBBBPPBBBBBBBBRRR   ',
+                                    '   RRRBBBBBBBBBPPBBBBB####BBBBBPPBBBBBBBBBRRR   ',
+                                    '   RRRRBBBBBBBBBPPBBBBBBBBBBBBPPBBBBBBBBBRRRR   ',
+                                    '    RRRBBBBBBBBBBBPPPBBBBBBPPPBBBBBBBBBBBRRR    ',
+                                    '    RRRRBBBBBBBBBBBBPPPPPPPPBBBBBBBBBBBBRRRR    ',
+                                    '     RRRRBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBRRRR     ',
+                                    '     RRRRRBBBBBBBBBBBBBBBBBBBBBBBBBBBBRRRRR     ',
+                                    '      RRRRRBBBBBBBBBBBBBBBBBBBBBBBBBBRRRRR      ',
+                                    '        RRRRRBBBBBBBBBBBBBBBBBBBBBBRRRRR        ',
+                                    '         RRRRRRRRBBBBBBBBBBBBBBRRRRRRRR         ',
+                                    '            RRRRRRRRRRRRRRRRRRRRRRRR            ',
+                                    '                RRRRRRRRRRRRRRRR                ',
+                                    '                                                ',
+                                    '                                                '
                                 ],
                                 [
-                                    ' RR   BBBBBB   RR   ',
-                                    '  RR BBBBBBBB RR    ',
-                                    '   RRBBBBBBBBR      ',
-                                    '    BBBBBBBBBB      ',
-                                    '   BBBB####BBBB     ',
-                                    '  BBB######BBB      ',
-                                    ' BBB########BBB     ',
-                                    'BBB##########BBB    ',
-                                    'BBB##########BBB    ',
-                                    'BBB##########BBB    ',
-                                    ' BBB########BBB     ',
-                                    '  BBB######BBB      ',
-                                    '   BBBB####BBBB     ',
-                                    '    BBBBBBBBBB      ',
-                                    '  RR  BBBBBB  RR    ',
-                                    'RR      BB      RR  '
+                                    '                                                ',
+                                    '                                                ',
+                                    '                RRRRRRRRRRRRRRRR                ',
+                                    '            RRRRRRRRRRRRRRRRRRRRRRRR            ',
+                                    '         RRRRRRRRBBBBBBBBBBBBBBRRRRRRRR         ',
+                                    '        RRRRRBBBBBBBBBBBBBBBBBBBBBBRRRRR        ',
+                                    '      RRRRRBBBBBBBBBBBBBBBBBBBBBBBBBBRRRRR      ',
+                                    '     RRRRRBBBBBBBBBBBBBBBBBBBBBBBBBBBBRRRRR     ',
+                                    '     RRRRBBBBBBBBBBBBPPPPPPBBBBBBBBBBBBRRRR     ',
+                                    '    RRRRBBBBBBBBBPPPPPBBBBPPPPPBBBBBBBBBRRRR    ',
+                                    '    RRRBBBBBBBBBPPBBBBBBBBBBBBPPBBBBBBBBBRRR    ',
+                                    '   RRRRBBBBBBBPPPBBBBBBBBBBBBBBPPPBBBBBBBRRRR   ',
+                                    '   RRRBBBBBBBPPBBBBBBB####BBBBBBBPPBBBBBBBRRR   ',
+                                    '   RRRBBBBBBBPPBBBBBBB####BBBBBBBPPBBBBBBBRRR   ',
+                                    '   RRRBBBBBBPPBBBBB##########BBBBBPPBBBBBBRRR   ',
+                                    '   RRRBBBBBBPPBBBBB##########BBBBBPPBBBBBBRRR   ',
+                                    '   RRRBBBBBBPPBBBBB##########BBBBBPPBBBBBBRRR   ',
+                                    '   RRRBBBBBBPPBBBBB##########BBBBBPPBBBBBBRRR   ',
+                                    '   RRRBBBBBBBPPBBBBBBB####BBBBBBBPPBBBBBBBRRR   ',
+                                    '   RRRBBBBBBBPPBBBBBBB####BBBBBBBPPBBBBBBBRRR   ',
+                                    '   RRRRBBBBBBBPPPBBBBBBBBBBBBBBPPPBBBBBBBRRRR   ',
+                                    '    RRRBBBBBBBBBPPBBBBBBBBBBBBPPBBBBBBBBBRRR    ',
+                                    '    RRRRBBBBBBBBBPPPPPBBBBPPPPPBBBBBBBBBRRRR    ',
+                                    '     RRRRBBBBBBBBBBBBPPPPPPBBBBBBBBBBBBRRRR     ',
+                                    '     RRRRRBBBBBBBBBBBBBBBBBBBBBBBBBBBBRRRRR     ',
+                                    '      RRRRRBBBBBBBBBBBBBBBBBBBBBBBBBBRRRRR      ',
+                                    '        RRRRRBBBBBBBBBBBBBBBBBBBBBBRRRRR        ',
+                                    '         RRRRRRRRBBBBBBBBBBBBBBRRRRRRRR         ',
+                                    '            RRRRRRRRRRRRRRRRRRRRRRRR            ',
+                                    '                RRRRRRRRRRRRRRRR                ',
+                                    '                                                ',
+                                    '                                                '
                                 ]
                             ],
-                            colors: { 'B': '#990000', 'R': '#ff0000', '#': '#000000' }
+                            colors: { 'B': '#550066', 'R': '#ff0044', 'P': '#00eeff', '#': '#000000' }
                         },
                         {
                             patterns: [
                                 [
-                                    '        ##          ',
-                                    '       ####         ',
-                                    '      ######        ',
-                                    '     BB####BB       ',
-                                    '    BBB####BBB      ',
-                                    '   BBBB####BBBB     ',
-                                    '  BBBBB####BBBBB    ',
-                                    ' BBBBBB####BBBBBB   ',
-                                    'BBBBBBB####BBBBBBB  ',
-                                    'BBBBBBB####BBBBBBB  ',
-                                    ' BBBBBB####BBBBBB   ',
-                                    '  BBBBB####BBBBB    ',
-                                    '   BBBB####BBBB     ',
-                                    '    BBB####BBB      ',
-                                    '     BB####BB       ',
-                                    '      ######        '
+                                    '                                                ',
+                                    '                 RRRRRRRRRRRRRR                 ',
+                                    '             RRRRRRRRRRRRRRRRRRRRRR             ',
+                                    '           RRRRRRRRRRBBBBBBRRRRRRRRRR           ',
+                                    '         RRRRRRRBBBBBBBBBBBBBBBBRRRRRRR         ',
+                                    '       RRRRRRBBBBBBBBBBBBBBBBBBBBBBRRRRRR       ',
+                                    '      RRRRRBBBBBBBBBBBBBBBBBBBBBBBBBBRRRRR      ',
+                                    '     RRRRRBBBBBBBBBBBYYYYYYBBBBBBBBBBBRRRRR     ',
+                                    '    RRRRRBBBBBBBBBBYYYYYYYYYYBBBBBBBBBBRRRRR    ',
+                                    '    RRRRBBBBBBBBBBYYYYYYYYYYYYBBBBBBBBBBRRRR    ',
+                                    '   RRRRBBBBBBBBBBYYYYCCCCCCYYYYBBBBBBBBBBRRRR   ',
+                                    '   RRRBBBBBBBBBBYYYCCCCCCCCCCYYYBBBBBBBBBBRRR   ',
+                                    '  RRRRBBBBBBBBBBYYYCCCCCCCCCCYYYBBBBBBBBBBRRRR  ',
+                                    '  RRRRBBBBBBBBBYYYCCCCC##CCCCCYYYBBBBBBBBBRRRR  ',
+                                    '  RRRRBBBBBBBBBYYYCCCC####CCCCYYYBBBBBBBBBRRRR  ',
+                                    '  RRRRBBBBBBBBBYYYCCC######CCCYYYBBBBBBBBBRRRR  ',
+                                    '  RRRRBBBBBBBBBYYYCCC######CCCYYYBBBBBBBBBRRRR  ',
+                                    '  RRRRBBBBBBBBBYYYCCCC####CCCCYYYBBBBBBBBBRRRR  ',
+                                    '  RRRRBBBBBBBBBYYYCCCCC##CCCCCYYYBBBBBBBBBRRRR  ',
+                                    '  RRRRBBBBBBBBBBYYYCCCCCCCCCCYYYBBBBBBBBBBRRRR  ',
+                                    '   RRRBBBBBBBBBBYYYCCCCCCCCCCYYYBBBBBBBBBBRRR   ',
+                                    '   RRRRBBBBBBBBBBYYYYCCCCCCYYYYBBBBBBBBBBRRRR   ',
+                                    '    RRRRBBBBBBBBBBYYYYYYYYYYYYBBBBBBBBBBRRRR    ',
+                                    '    RRRRRBBBBBBBBBBYYYYYYYYYYBBBBBBBBBBRRRRR    ',
+                                    '     RRRRRBBBBBBBBBBBYYYYYYBBBBBBBBBBBRRRRR     ',
+                                    '      RRRRRBBBBBBBBBBBBBBBBBBBBBBBBBBRRRRR      ',
+                                    '       RRRRRRBBBBBBBBBBBBBBBBBBBBBBRRRRRR       ',
+                                    '         RRRRRRRBBBBBBBBBBBBBBBBRRRRRRR         ',
+                                    '           RRRRRRRRRRBBBBBBRRRRRRRRRR           ',
+                                    '             RRRRRRRRRRRRRRRRRRRRRR             ',
+                                    '                 RRRRRRRRRRRRRR                 ',
+                                    '                                                '
                                 ],
                                 [
-                                    '       ####         ',
-                                    '      ######        ',
-                                    '     BB####BB       ',
-                                    '    BBB####BBB      ',
-                                    '   BBBB####BBBB     ',
-                                    '  BBBBB####BBBBB    ',
-                                    ' BBBBBB####BBBBBB   ',
-                                    'BBBBBBB####BBBBBBB  ',
-                                    'BBBBBBB####BBBBBBB  ',
-                                    'BBBBBBB####BBBBBBB  ',
-                                    ' BBBBBB####BBBBBB   ',
-                                    '  BBBBB####BBBBB    ',
-                                    '   BBBB####BBBB     ',
-                                    '    BBB####BBB      ',
-                                    '     BB####BB       ',
-                                    '        ##          '
+                                    '                                                ',
+                                    '                 RRRRRRRRRRRRRR                 ',
+                                    '             RRRRRRRRRRRRRRRRRRRRRR             ',
+                                    '           RRRRRRRRRRBBBBBBRRRRRRRRRR           ',
+                                    '         RRRRRRRBBBBBBBBBBBBBBBBRRRRRRR         ',
+                                    '       RRRRRRBBBBBBBYYYYYYYYBBBBBBBRRRRRR       ',
+                                    '      RRRRRBBBBBBBYYYYYYYYYYYYBBBBBBBRRRRR      ',
+                                    '     RRRRRBBBBBBBYYYYYYYYYYYYYYBBBBBBBRRRRR     ',
+                                    '    RRRRRBBBBBBBYYYYYCCCCCCYYYYYBBBBBBBRRRRR    ',
+                                    '    RRRRBBBBBBBYYYYCCCCCCCCCCYYYYBBBBBBBRRRR    ',
+                                    '   RRRRBBBBBBBYYYYCCCCCCCCCCCCYYYYBBBBBBBRRRR   ',
+                                    '   RRRBBBBBBBBYYYCCCCCCCCCCCCCCYYYBBBBBBBBRRR   ',
+                                    '  RRRRBBBBBBBYYYYCCCCCCCCCCCCCCYYYYBBBBBBBRRRR  ',
+                                    '  RRRRBBBBBBBYYYCCCCCC####CCCCCCYYYBBBBBBBRRRR  ',
+                                    '  RRRRBBBBBBBYYYCCCCC######CCCCCYYYBBBBBBBRRRR  ',
+                                    '  RRRRBBBBBBBYYYCCCCC######CCCCCYYYBBBBBBBRRRR  ',
+                                    '  RRRRBBBBBBBYYYCCCCC######CCCCCYYYBBBBBBBRRRR  ',
+                                    '  RRRRBBBBBBBYYYCCCCC######CCCCCYYYBBBBBBBRRRR  ',
+                                    '  RRRRBBBBBBBYYYCCCCCC####CCCCCCYYYBBBBBBBRRRR  ',
+                                    '  RRRRBBBBBBBYYYYCCCCCCCCCCCCCCYYYYBBBBBBBRRRR  ',
+                                    '   RRRBBBBBBBBYYYCCCCCCCCCCCCCCYYYBBBBBBBBRRR   ',
+                                    '   RRRRBBBBBBBYYYYCCCCCCCCCCCCYYYYBBBBBBBRRRR   ',
+                                    '    RRRRBBBBBBBYYYYCCCCCCCCCCYYYYBBBBBBBRRRR    ',
+                                    '    RRRRRBBBBBBBYYYYYCCCCCCYYYYYBBBBBBBRRRRR    ',
+                                    '     RRRRRBBBBBBBYYYYYYYYYYYYYYBBBBBBBRRRRR     ',
+                                    '      RRRRRBBBBBBBYYYYYYYYYYYYBBBBBBBRRRRR      ',
+                                    '       RRRRRRBBBBBBBYYYYYYYYBBBBBBBRRRRRR       ',
+                                    '         RRRRRRRBBBBBBBBBBBBBBBBRRRRRRR         ',
+                                    '           RRRRRRRRRRBBBBBBRRRRRRRRRR           ',
+                                    '             RRRRRRRRRRRRRRRRRRRRRR             ',
+                                    '                 RRRRRRRRRRRRRR                 ',
+                                    '                                                '
                                 ]
                             ],
-                            colors: { 'B': '#660000', 'R': '#cc0000', '#': '#000000' }
+                            colors: { 'B': '#661100', 'R': '#ff3300', 'Y': '#ffcc00', 'C': '#00ffff', '#': '#000000' }
                         },
                         {
                             patterns: [
                                 [
-                                    'RR  BBBBBBBBBBBB  RR',
-                                    'RRR BBBBBBBBBBBB RRR',
-                                    ' RRRBBBBBBBBBBBBRRR ',
-                                    '  RRBBBBBBBBBBBBR   ',
-                                    '   BBBB########BBBB ',
-                                    '  BBB##########BBB  ',
-                                    ' BBB############BBB ',
-                                    'BBB##############BBB',
-                                    'BBB##############BBB',
-                                    'BBB##############BBB',
-                                    ' BBB############BBB ',
-                                    '  BBB##########BBB  ',
-                                    '   BBBB########BBBB ',
-                                    '  RR BBBBBBBBBB RR  ',
-                                    ' RRR  BBBBBBBB  RRR ',
-                                    'RR     BBBBBB     RR'
+                                    '                                                ',
+                                    '                RRRRRRRRRRRRRRRR                ',
+                                    '            RRRRRRRRRRRRRRRRRRRRRRRR            ',
+                                    '          RRRRRRRBBBBBBBBBBBBBBRRRRRRR          ',
+                                    '        RRRRRBBBBBBBBBBBBBBBBBBBBBBRRRRR        ',
+                                    '       RRRRBBBBBBBBBBBBBBBBBBBBBBBBBBRRRR       ',
+                                    '     RRRRRBBBBBBBBBBBBBBBBBBBBBBBBBBBBRRRRR     ',
+                                    '     RRRBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBRRR     ',
+                                    '    RRRBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBRRR    ',
+                                    '   RRRRBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBRRRR   ',
+                                    '   RRRBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBRRR   ',
+                                    '   RRRBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBRRR   ',
+                                    '  RRRBBBBBBBBBBBBBBBBB####BBBBBBBBBBBBBBBBBRRR  ',
+                                    '  RRRBBMMMMBBBBBBBBBBB####BBBBBBBBBBBMMMMBBRRR  ',
+                                    '  RRRMMMMMMMMBBBBBB##########BBBBBBMMMMMMMMRRR  ',
+                                    '  RRRMMMMMMMMBBBBBB##########BBBBBBMMMMMMMMRRR  ',
+                                    '  RRMMMMMMMMMMBBBBB##########BBBBBMMMMMMMMMMRR  ',
+                                    '  RRMMMM##MMMMBBBBB##########BBBBBMMMM##MMMMRR  ',
+                                    '  RRMMMM##MMMMBBBBBBBB####BBBBBBBBMMMM##MMMMRR  ',
+                                    '  RRMMMMMMMMMMBBBBBBBB####BBBBBBBBMMMMMMMMMMRR  ',
+                                    '   RRMMMMMMMMBBBBBBBBBBBBBBBBBBBBBBMMMMMMMMRR   ',
+                                    '   RRMMMMMMMMBBBBBBBBBBBBBBBBBBBBBBMMMMMMMMRR   ',
+                                    '   RRRRMMMMBBBBBBBBBBBBBBBBBBBBBBBBBBMMMMRRRR   ',
+                                    '    RRRBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBRRR    ',
+                                    '     RRRBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBRRR     ',
+                                    '     RRRRRBBBBBBBBBBBBBBBBBBBBBBBBBBBBRRRRR     ',
+                                    '       RRRRBBBBBBBBBBBBBBBBBBBBBBBBBBRRRR       ',
+                                    '        RRRRRBBBBBBBBBBBBBBBBBBBBBBRRRRR        ',
+                                    '          RRRRRRRBBBBBBBBBBBBBBRRRRRRR          ',
+                                    '            RRRRRRRRRRRRRRRRRRRRRRRR            ',
+                                    '                RRRRRRRRRRRRRRRR                ',
+                                    '                                                '
                                 ],
                                 [
-                                    ' RR BBBBBBBBBBBB RR ',
-                                    'RRRR BBBBBBBBBB RRRR',
-                                    ' RRRBBBBBBBBBBBBRRR ',
-                                    '  RRBBBBBBBBBBBBR   ',
-                                    '   BBBB########BBBB ',
-                                    '  BBB##########BBB  ',
-                                    ' BBB############BBB ',
-                                    'BBB##############BBB',
-                                    'BBB##############BBB',
-                                    'BBB##############BBB',
-                                    ' BBB############BBB ',
-                                    '  BBB##########BBB  ',
-                                    '   BBBB########BBBB ',
-                                    '  RRR BBBBBBBB RRR  ',
-                                    'RR     BBBBBB     RR',
-                                    'R       BBBB       R'
+                                    '                                                ',
+                                    '                RRRRRRRRRRRRRRRR                ',
+                                    '            RRRRRRRRRRRRRRRRRRRRRRRR            ',
+                                    '          RRRRRRRBBBBBBBBBBBBBBRRRRRRR          ',
+                                    '        RRRRRBBBBBBBBBBBBBBBBBBBBBBRRRRR        ',
+                                    '       RRRRBBBBBBBBBBBBBBBBBBBBBBBBBBRRRR       ',
+                                    '     RRRRRBBBBBBBBBBBBBBBBBBBBBBBBBBBBRRRRR     ',
+                                    '     RRRBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBRRR     ',
+                                    '    RRRBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBRRR    ',
+                                    '   RRRRBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBRRRR   ',
+                                    '   RRRBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBRRR   ',
+                                    '   RRRBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBRRR   ',
+                                    '  RRRBBBBBBBBBBBBBBBBB####BBBBBBBBBBBBBBBBBRRR  ',
+                                    '  RRRBBBBBBBBBBBBBBBBB####BBBBBBBBBBBBBBBBBRRR  ',
+                                    '  RRRBBMMMMBBBBBBBB##########BBBBBBBBMMMMBBRRR  ',
+                                    '  RRRMMMMMMMMBBBBBB##########BBBBBBMMMMMMMMRRR  ',
+                                    '  RRRMMMMMMMMBBBBBB##########BBBBBBMMMMMMMMRRR  ',
+                                    '  RRMMMMMMMMMMBBBBB##########BBBBBMMMMMMMMMMRR  ',
+                                    '  RRMMMM##MMMMBBBBBBBB####BBBBBBBBMMMM##MMMMRR  ',
+                                    '  RRMMMM##MMMMBBBBBBBB####BBBBBBBBMMMM##MMMMRR  ',
+                                    '   RMMMMMMMMMMBBBBBBBBBBBBBBBBBBBBMMMMMMMMMMR   ',
+                                    '   RRMMMMMMMMBBBBBBBBBBBBBBBBBBBBBBMMMMMMMMRR   ',
+                                    '   RRMMMMMMMMBBBBBBBBBBBBBBBBBBBBBBMMMMMMMMRR   ',
+                                    '    RRRMMMMBBBBBBBBBBBBBBBBBBBBBBBBBBMMMMRRR    ',
+                                    '     RRRBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBRRR     ',
+                                    '     RRRRRBBBBBBBBBBBBBBBBBBBBBBBBBBBBRRRRR     ',
+                                    '       RRRRBBBBBBBBBBBBBBBBBBBBBBBBBBRRRR       ',
+                                    '        RRRRRBBBBBBBBBBBBBBBBBBBBBBRRRRR        ',
+                                    '          RRRRRRRBBBBBBBBBBBBBBRRRRRRR          ',
+                                    '            RRRRRRRRRRRRRRRRRRRRRRRR            ',
+                                    '                RRRRRRRRRRRRRRRR                ',
+                                    '                                                '
                                 ]
                             ],
-                            colors: { 'B': '#aa0000', 'R': '#ff2222', '#': '#000000' }
+                            colors: { 'B': '#770000', 'R': '#ff2222', 'M': '#33cc33', '#': '#000000' }
                         }
                     ];
                     
                     const bossSprite = bossSprites[this.spriteType];
                     const pattern = bossSprite.patterns[this.animFrame];
                     const colorMap = bossSprite.colors;
+                    const bossPixelSize = 2; // 48x32 grid at 2px/cell = 96x64, matching the boss hitbox
                     
                     Object.keys(colorMap).forEach(pixelType => {
                         game.ctx.fillStyle = colorMap[pixelType];
@@ -1798,7 +1934,7 @@
                         for (let row = 0; row < pattern.length; row++) {
                             for (let col = 0; col < pattern[row].length; col++) {
                                 if (pattern[row][col] === pixelType) {
-                                    game.ctx.rect(px + col * basePixelSize, py + row * basePixelSize, basePixelSize, basePixelSize);
+                                    game.ctx.rect(px + col * bossPixelSize, py + row * bossPixelSize, bossPixelSize, bossPixelSize);
                                 }
                             }
                         }
@@ -1990,7 +2126,11 @@
                     
                     const sprite = alienSprites[this.spriteType];
                     const pattern = sprite.patterns[this.animFrame];
-                    const colorMap = sprite.colors;
+                    // Mini aliens (spawned by the Spawner boss) keep their normal shape
+                    // but are recolored solid red so they read as "spawned" enemies.
+                    const colorMap = this.isMiniAlien
+                        ? Object.fromEntries(Object.keys(sprite.colors).map(k => [k, k === '#' ? '#661111' : '#ff2222']))
+                        : sprite.colors;
                     
                     game.ctx.imageSmoothingEnabled = false;
                     
@@ -2136,7 +2276,7 @@
                 this.width = type === 'spider' ? 18 : (type === 'alienshot' ? 5 : 6);
                 this.height = type === 'spider' ? 36 : (type === 'alienshot' ? 14 : 12);
                 
-                if (type === 'destroyer' && targetX !== null && targetY !== null) {
+                if ((type === 'destroyer' || type === 'spider') && targetX !== null && targetY !== null) {
                     const dx = targetX - x;
                     const dy = targetY - y;
                     const distance = Math.sqrt(dx * dx + dy * dy);
@@ -3129,18 +3269,8 @@
                 
                 game.ammo += ammoGain;
                 game.score += 10;
-                
-                if (game.isBonusQuiz) game.bonusCorrectCount++;
-                
-                // Item: 4 correct answers in a row within a normal quiz earns a
-                // random bonus (doesn't stack with the separate boss bonus-quiz reward).
-                game.quizCorrectStreak++;
-                if (!game.isBonusQuiz && !game.quizPerfectBonusAwarded && game.quizCorrectStreak >= 4) {
-                    game.quizPerfectBonusAwarded = true;
-                    awardPerfectQuizBonus();
-                }
+                game.quizCorrectCount++;
             } else {
-                game.quizCorrectStreak = 0;
                 if (game.shields > 0) {
                     game.shields--;
                 } else {
@@ -3159,35 +3289,13 @@
             game.questionsAnswered++;
             
             setTimeout(() => {
-                const forcedFourQuestions = game.difficulty === 'easy' || game.isBonusQuiz;
+                const forcedFourQuestions = game.difficulty === 'easy';
                 if (forcedFourQuestions && game.questionsAnswered >= game.totalQuestionsThisQuiz) {
                     endQuiz();
                 } else if (forcedFourQuestions) {
                     nextQuestion();
                 }
             }, 200);
-        }
-
-        // Awarded the moment a student answers 4 questions in a row correctly within
-        // a single (non-bonus) quiz. Picks one random bonus and applies it immediately.
-        function awardPerfectQuizBonus() {
-            const bonusOptions = [
-                { label: '+10 Ammo', apply: () => { game.ammo += 10; } },
-                { label: '+5% Fire Rate', apply: () => { game.quizBonusFireRateMult *= 0.95; } },
-                { label: '+5% Movement Speed', apply: () => { game.quizBonusSpeedMult *= 1.05; } },
-                { label: '+1 Health', apply: () => { game.lives += 1; } }
-            ];
-            const choice = bonusOptions[Math.floor(Math.random() * bonusOptions.length)];
-            choice.apply();
-            updateUI();
-            
-            const resultDiv = document.getElementById('quizResult');
-            if (resultDiv) {
-                resultDiv.innerHTML = `🎉 <strong style="color: var(--green-success);">Perfect streak bonus!</strong> ${choice.label}`;
-                setTimeout(() => {
-                    if (resultDiv.innerHTML.includes(choice.label)) resultDiv.innerHTML = '';
-                }, 2500);
-            }
         }
 
         // ===== Permanent (cross-run) upgrade shop - now lives on the Game Over screen =====
@@ -3383,10 +3491,6 @@
             game.shotsFiredThisRun = 0;
             game.totalEnemiesDefeatedAllTime = savedTotalEnemiesDefeated;
             game.runPowerups = {};
-            game.quizBonusSpeedMult = 1;
-            game.quizBonusFireRateMult = 1;
-            game.quizCorrectStreak = 0;
-            game.quizPerfectBonusAwarded = false;
             game.firstQuizAwarded = false;
             
             game.secretCodeActive = false;
@@ -3429,10 +3533,6 @@
             game.lives = game.baseLives;
             game.shields = 0;
             game.runPowerups = {};
-            game.quizBonusSpeedMult = 1;
-            game.quizBonusFireRateMult = 1;
-            game.quizCorrectStreak = 0;
-            game.quizPerfectBonusAwarded = false;
             game.firstQuizAwarded = false;
             
             if (game.secretCodeActive) {
@@ -3467,8 +3567,6 @@
         }
 
         function startQuiz() {
-            game.isBonusQuiz = false;
-            
             if (game.skipQuizzes) {
                 startWave();
                 return;
@@ -3477,38 +3575,13 @@
             game.state = GameState.QUIZ;
             game.questionsAnswered = 0;
             game.usedQuestions = [];
-            game.quizCorrectStreak = 0;
-            game.quizPerfectBonusAwarded = false;
+            game.quizCorrectCount = 0;
             
             if (game.difficulty === 'easy') {
                 game.totalQuestionsThisQuiz = 4;
             }
             
             document.getElementById('quizTitleText').textContent = currentSubjectName ? currentSubjectName.toUpperCase() : '';
-            document.getElementById('quiz').style.display = 'block';
-            nextQuestion();
-        }
-
-        // Item 8: after defeating a boss, 4 bonus questions replace the normal post-boss
-        // quiz. Correct answers still grant ammo as usual, and the number answered
-        // correctly determines how many run-only power-up options are unlocked.
-        function startBonusQuiz() {
-            game.isBonusQuiz = true;
-            game.bonusCorrectCount = 0;
-            
-            if (game.skipQuizzes) {
-                showBonusPowerupSelect(4);
-                return;
-            }
-            
-            game.state = GameState.QUIZ;
-            game.questionsAnswered = 0;
-            game.usedQuestions = [];
-            game.totalQuestionsThisQuiz = 4;
-            game.quizCorrectStreak = 0;
-            game.quizPerfectBonusAwarded = false;
-            
-            document.getElementById('quizTitleText').textContent = '🏆 BONUS: ' + (currentSubjectName ? currentSubjectName.toUpperCase() : '');
             document.getElementById('quiz').style.display = 'block';
             nextQuestion();
         }
@@ -3571,13 +3644,13 @@
                 optionsDiv.appendChild(optionDiv);
             });
             
-            if (game.difficulty === 'easy' || game.isBonusQuiz) {
+            if (game.difficulty === 'easy') {
                 document.getElementById('quizProgress').textContent = `Question ${game.questionsAnswered + 1} of ${game.totalQuestionsThisQuiz}`;
             } else {
                 document.getElementById('quizProgress').textContent = `Questions Answered: ${game.questionsAnswered}`;
             }
             
-            if (game.difficulty === 'medium' && !game.isBonusQuiz) {
+            if (game.difficulty === 'medium') {
                 if (game.questionsAnswered === 0) {
                     game.quizTimeLeft = 15;
                     game.quizTimer = setInterval(() => {
@@ -3600,24 +3673,27 @@
         function endQuiz() {
             clearInterval(game.quizTimer);
             hideAllModals();
-            if (game.isBonusQuiz) {
-                showBonusPowerupSelect(game.bonusCorrectCount);
-            } else if (!game.firstQuizAwarded) {
-                // Item: give a free random power-up choice right after the very
-                // first quiz of the run, before wave 1 begins.
-                game.firstQuizAwarded = true;
-                showBonusPowerupSelect(1, true);
-            } else {
-                startWave();
+            
+            const wasFirstQuiz = !game.firstQuizAwarded;
+            game.firstQuizAwarded = true;
+            
+            let rewardCount = game.quizCorrectCount;
+            let isFreeStarter = false;
+            if (wasFirstQuiz && rewardCount === 0) {
+                // Guarantee a free pick after the very first quiz, even with 0 correct.
+                rewardCount = 1;
+                isFreeStarter = true;
             }
+            
+            showQuizRewardSelect(rewardCount, isFreeStarter);
         }
 
-        // Presents `count` random, unique power-up options; the player picks exactly one.
-        // When isFreeStarter is true, the modal text is tweaked to explain that this
-        // one is a free gift for finishing their first quiz (not earned via a boss fight).
-        function showBonusPowerupSelect(count, isFreeStarter) {
-            game.isBonusQuiz = false;
-            
+        // For every question answered correctly this quiz, the player gets to choose
+        // 1 power-up out of that many random unique options (0 correct = 0 picks,
+        // 4 correct = pick 1 of 4 options). Picking a power-up they already own
+        // upgrades it instead. When isFreeStarter is true, the modal text is tweaked
+        // to explain it's a free gift for finishing their first quiz.
+        function showQuizRewardSelect(count, isFreeStarter) {
             const titleEl = document.getElementById('powerupSelectTitle');
             const subtitleEl = document.getElementById('powerupSelectSubtitle');
             if (isFreeStarter) {
@@ -3625,7 +3701,7 @@
                 if (subtitleEl) subtitleEl.textContent = 'A free gift for finishing your first quiz. This power-up lasts for the rest of this run.';
             } else {
                 if (titleEl) titleEl.textContent = '⚡ CHOOSE A POWER-UP';
-                if (subtitleEl) subtitleEl.textContent = 'This power-up lasts for the rest of this run only.';
+                if (subtitleEl) subtitleEl.textContent = `You got ${count} question${count === 1 ? '' : 's'} correct - pick 1 power-up to unlock or upgrade!`;
             }
             
             if (count <= 0) {
@@ -3680,6 +3756,76 @@
             updateUI();
             hideAllModals();
             startWave();
+        }
+
+        // After a boss is defeated the player gets a free upgrade to a power-up they
+        // already own (their choice of which one). If they don't own any yet (or
+        // everything they own is already maxed out), they get one brand-new random
+        // power-up for free instead.
+        function showBossUpgradeSelect() {
+            const titleEl = document.getElementById('powerupSelectTitle');
+            const subtitleEl = document.getElementById('powerupSelectSubtitle');
+            const container = document.getElementById('powerupSelectOptions');
+            container.innerHTML = '';
+            
+            const upgradeableOwned = Object.keys(game.runPowerups).filter(key => {
+                const level = game.runPowerups[key] || 0;
+                return level > 0 && level < POWERUP_DEFS[key].maxLevel;
+            });
+            
+            if (upgradeableOwned.length > 0) {
+                if (titleEl) titleEl.textContent = '🏆 BOSS DEFEATED! Free Upgrade!';
+                if (subtitleEl) subtitleEl.textContent = 'Pick one of your power-ups to upgrade for free.';
+                
+                upgradeableOwned.forEach(key => {
+                    const def = POWERUP_DEFS[key];
+                    const level = game.runPowerups[key] || 0;
+                    const div = document.createElement('div');
+                    div.className = 'option';
+                    div.innerHTML = `<strong style="color: var(--blue-highlight);">${def.name} (Lv ${level})</strong><br><span style="font-size: 14px; color: #cccccc;">${def.desc(level)}</span>`;
+                    div.onclick = () => grantBossPowerup(key);
+                    container.appendChild(div);
+                });
+            } else {
+                const pool = POWERUP_KEYS.filter(key => {
+                    if (key === 'boomerangShots' && (game.runPowerups.boomerangShots || 0) >= 1) return false;
+                    return (game.runPowerups[key] || 0) < POWERUP_DEFS[key].maxLevel;
+                });
+                
+                if (pool.length === 0) {
+                    // Nothing left to grant - skip straight to the next quiz.
+                    startQuiz();
+                    return;
+                }
+                
+                const key = pool[Math.floor(Math.random() * pool.length)];
+                const def = POWERUP_DEFS[key];
+                if (titleEl) titleEl.textContent = '🏆 BOSS DEFEATED! Free Power-Up!';
+                if (subtitleEl) subtitleEl.textContent = "You don't have a power-up to upgrade yet, so here's a free new one.";
+                const div = document.createElement('div');
+                div.className = 'option';
+                div.innerHTML = `<strong style="color: var(--blue-highlight);">${def.name}</strong><br><span style="font-size: 14px; color: #cccccc;">${def.desc(0)}</span>`;
+                div.onclick = () => grantBossPowerup(key);
+                container.appendChild(div);
+            }
+            
+            game.state = GameState.QUIZ; // reuse quiz-like pause state so gameplay stays frozen
+            hideAllModals();
+            document.getElementById('powerupSelect').style.display = 'block';
+        }
+
+        function grantBossPowerup(key) {
+            game.runPowerups[key] = (game.runPowerups[key] || 0) + 1;
+            
+            if (key === 'repairedHulls') {
+                if (game.lives < game.baseLives) game.lives++;
+            } else if (key === 'shieldWall') {
+                game.lives++;
+            }
+            
+            updateUI();
+            hideAllModals();
+            startQuiz();
         }
 
         function startWave() {
@@ -3863,7 +4009,7 @@
                 game.wave++;
                 setTimeout(() => {
                     if (wasBossWave) {
-                        startBonusQuiz();
+                        showBossUpgradeSelect();
                     } else {
                         startQuiz();
                     }
@@ -3893,6 +4039,18 @@
             }
             
             return false;
+        }
+
+        // Finds the beam's x position at a given y along its bent path (diagonal
+        // segment from start to bounce, then straight down from bounce to end).
+        // Used to knock the player out of the beam sideways when they get hit.
+        function getBeamXAtY(beamPath, y) {
+            const { start, bounce } = beamPath;
+            if (y <= bounce.y || bounce.y === start.y) {
+                const t = (y - start.y) / (bounce.y - start.y || 1);
+                return start.x + (bounce.x - start.x) * t;
+            }
+            return bounce.x;
         }
 
         function isPointNearLine(px, py, x1, y1, x2, y2, threshold) {
@@ -4293,6 +4451,17 @@
                                 game.lives--;
                             }
                             updateUI();
+                            
+                            // Knockback: push the player sideways out of the beam
+                            const beamXAtPlayer = getBeamXAtY(beamPath, game.player.y + game.player.height / 2);
+                            const playerCenterX = game.player.x + game.player.width / 2;
+                            const pushDir = playerCenterX >= beamXAtPlayer ? 1 : -1;
+                            const knockbackDistance = 60;
+                            game.player.x = Math.max(0, Math.min(
+                                game.width - game.player.width,
+                                game.player.x + pushDir * knockbackDistance
+                            ));
+                            
                             break;
                         }
                     }
