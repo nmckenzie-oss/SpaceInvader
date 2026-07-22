@@ -672,26 +672,26 @@
 
         // Metadata + logic for the run-specific bonus power-ups earned after defeating a boss.
         const POWERUP_DEFS = {
-            extraShotSpread: { name: 'Extra Shot (Spread)', maxLevel: Infinity, desc: (l) => `Fire an extra shot in a spread pattern. Level ${l+1}.` },
-            extraShotForward: { name: 'Extra Shot (Forward)', maxLevel: Infinity, desc: (l) => `Fire another forward shot beside your existing shots. Level ${l+1}.` },
-            laserShot: { name: 'Laser Shot', maxLevel: Infinity, desc: (l) => `Bullets grow 200% longer and damage anything they touch along their length. Level ${l+1}.` },
-            higherCaliber: { name: 'Higher Calibre', maxLevel: Infinity, desc: (l) => `Bullets are 100% wider with a rocket-trail pixel effect. Level ${l+1}.` },
+            extraShotSpread: { name: 'Extra Shot (Spread)', maxLevel: Infinity, desc: (l) => `Fire an extra shot in a spread pattern (+1 ammo used per shot). Level ${l+1}.` },
+            extraShotForward: { name: 'Extra Shot (Forward)', maxLevel: Infinity, desc: (l) => `Fire another forward shot beside your existing shots (+1 ammo used per shot). Level ${l+1}.` },
+            laserShot: { name: 'Laser Shot', maxLevel: Infinity, desc: (l) => `Bullets grow +200% longer than their base length per level and pierce up to ${l+1} enemies before the beam's piercing power drops off. Level ${l+1}.` },
+            higherCaliber: { name: 'Higher Calibre', maxLevel: Infinity, desc: (l) => `Bullets are +100% wider than their base width per level, with a rocket-trail pixel effect. Level ${l+1}.` },
             repairedHulls: { name: 'Repaired Hulls', maxLevel: Infinity, desc: (l) => `+1 Health (only if below starting health). Level ${l+1}.` },
             strongerThrusters: { name: 'Stronger Thrusters', maxLevel: Infinity, desc: (l) => `Move 10% faster with a bigger thruster effect. Level ${l+1}.` },
             ammoGeneration: { name: 'Ammo Generation', maxLevel: Infinity, desc: (l) => `+10 ammo per correct answer. Level ${l+1}.` },
             shieldWall: { name: 'Shield Wall', maxLevel: Infinity, desc: (l) => `+1 Bonus Health (can exceed starting health). Level ${l+1}.` },
             luckySalvage: { name: 'Lucky Salvage', maxLevel: Infinity, desc: (l) => `Enemies have a higher chance to drop bonus coins or ammo. Level ${l+1}.` },
-            splitShot: { name: 'Split Shot', maxLevel: Infinity, desc: (l) => `Bullets split into extra bullets after travelling 30% of the screen. Level ${l+1}.` },
+            splitShot: { name: 'Split Shot', maxLevel: Infinity, desc: (l) => `Bullets split into extra bullets after travelling 30% of the screen (the new bullets cost extra ammo). Level ${l+1}.` },
             explosiveAmmo: { name: 'Explosive Ammo', maxLevel: Infinity, desc: (l) => `Bullets explode in a small radius on impact. Level ${l+1}.` },
             lifeSteal: { name: 'Life Steal', maxLevel: 5, desc: (l) => `Recover 1 HP every ${20 - (l + 1)} enemies defeated. Level ${l+1}.` },
-            burstFire: { name: 'Burst Fire', maxLevel: Infinity, desc: (l) => `Fire bursts of bullets with a tiny delay between each shot. Level ${l+1}.` },
+            burstFire: { name: 'Burst Fire', maxLevel: Infinity, desc: (l) => `Fire ${l+1} extra volley(s) with a tiny delay between each (each extra volley costs its own ammo). Level ${l+1}.` },
             waveCannon: { name: 'Wave Cannon', maxLevel: Infinity, desc: (l) => `Bullets travel in a sine-wave pattern. Level ${l+1}.` },
             shrapnelRounds: { name: 'Shrapnel Rounds', maxLevel: Infinity, desc: (l) => `Bullets burst into shrapnel fragments on hit/expiry. Level ${l+1}.` },
             orbitingBlades: { name: 'Orbiting Blades', maxLevel: Infinity, desc: (l) => `Summon a rotating energy blade around your ship that damages enemies on contact. Level ${l+1}.` },
             bulletBloom: { name: 'Bullet Bloom', maxLevel: Infinity, desc: (l) => `Bullets grow larger the farther they travel. Level ${l+1}.` },
-            boomerangShots: { name: 'Boomerang Shots', maxLevel: 1, desc: (l) => `Bullets curve back toward your ship, hitting enemies twice.` },
+            boomerangShots: { name: 'Boomerang Shots', maxLevel: Infinity, desc: (l) => `Bullets bounce off the side walls up to ${l+1} time${l+1 === 1 ? '' : 's'} before disappearing. Level ${l+1}.` },
             piercingRound: { name: 'Piercing Round', maxLevel: Infinity, desc: (l) => `Bullets pierce +1 additional enemy. Level ${l+1}.` },
-            fasterShot: { name: 'Faster Shot', maxLevel: Infinity, desc: (l) => `Bullets fire 10% faster. Level ${l+1}.` },
+            fasterShot: { name: 'Faster Shot', maxLevel: Infinity, desc: (l) => `Bullets fire 10% faster than base fire rate per level. Level ${l+1}.` },
             prismCannon: { name: 'Prism Cannon', maxLevel: Infinity, desc: (l) => `Every 5th shot randomly gains extra effects. Level ${l+1}.` }
         };
         const POWERUP_KEYS = Object.keys(POWERUP_DEFS);
@@ -720,7 +720,6 @@
             '11-13dc': 'question-banks/senior-dance-choreography.json',
             '11-13dg': 'question-banks/senior-dance-genres.json',
             'science': 'question-banks/year-9-science-full.json',
-            'cooking':'question-banks/cooking.json',
         };
 
         // Question banks are a plain top-level array of { q, o, a } objects:
@@ -840,7 +839,7 @@
                 wave: rp.waveCannon || 0,
                 shrapnel: rp.shrapnelRounds || 0,
                 bloom: rp.bulletBloom || 0,
-                boomerang: !!rp.boomerangShots,
+                boomerang: rp.boomerangShots || 0,
                 pierce: rp.piercingRound || 0
             };
             if (extraForce) {
@@ -852,7 +851,7 @@
                     else if (key === 'waveCannon') mods.wave += 1;
                     else if (key === 'shrapnelRounds') mods.shrapnel += 1;
                     else if (key === 'bulletBloom') mods.bloom += 1;
-                    else if (key === 'boomerangShots') mods.boomerang = true;
+                    else if (key === 'boomerangShots') mods.boomerang += 1;
                     else if (key === 'piercingRound') mods.pierce += 1;
                 });
             }
@@ -909,11 +908,16 @@
                 }
 
                 const now = Date.now();
-                let currentFireRate = game.baseFireRate * Math.pow(0.9, game.permanentUpgrades.fireRateBoost);
                 
-                // Faster Shot run power-up
+                // Fire-rate reductions are linear percentages of the base fire rate
+                // (not compounding), summed together and applied once - so e.g. 5
+                // levels of a 10%/level upgrade means 50% off the ORIGINAL fire rate,
+                // not 0.9^5.
+                const fireRateBoostPct = game.permanentUpgrades.fireRateBoost * 0.1;
                 const fasterShotLevel = game.runPowerups.fasterShot || 0;
-                currentFireRate *= Math.pow(0.9, fasterShotLevel);
+                const fasterShotPct = fasterShotLevel * 0.1;
+                const totalFireRateReduction = Math.min(0.9, fireRateBoostPct + fasterShotPct);
+                let currentFireRate = game.baseFireRate * (1 - totalFireRateReduction);
                 
                 // Laser Shot fires 20% slower to balance its piercing beam
                 if ((game.runPowerups.laserShot || 0) > 0) {
@@ -926,8 +930,9 @@
                 }
                 
                 if (now - game.lastShot > currentFireRate && game.ammo > 0) {
-                    this.shoot();
-                    game.lastShot = now;
+                    if (this.shoot()) {
+                        game.lastShot = now;
+                    }
                 }
 
                 updateOrbitBlades();
@@ -985,10 +990,21 @@
             }
 
             shoot(isBurstEcho) {
-                if (game.ammo <= 0) return;
+                const rp = game.runPowerups;
+                
+                // Powerups that add extra bullets to a single shot (Extra Shot Spread/
+                // Forward) also increase that shot's ammo cost by however many bullets
+                // they added, on top of the base 1 ammo.
+                const extraBulletAmmoCost = (rp.extraShotForward || 0) + (rp.extraShotSpread || 0);
+                const shotAmmoCost = 1 + extraBulletAmmoCost;
+                
+                if (game.rapidFireActive) {
+                    if (game.ammo <= 0) return false;
+                } else {
+                    if (game.ammo < shotAmmoCost) return false;
+                }
 
                 if (!isBurstEcho) game.shotsFiredThisRun++;
-                const rp = game.runPowerups;
                 let extraForce = null;
                 if (rp.prismCannon > 0 && game.shotsFiredThisRun % 5 === 0) {
                     const pool = ['laserShot', 'higherCaliber', 'splitShot', 'explosiveAmmo', 'waveCannon', 'shrapnelRounds', 'bulletBloom', 'boomerangShots', 'piercingRound'];
@@ -1001,25 +1017,32 @@
                 this.fireBullets(specs, mods);
 
                 if (game.rapidFireActive) {
-                    game.rapidFireShotCounter++;
-                    if (game.rapidFireShotCounter >= 3) {
+                    game.rapidFireShotCounter += shotAmmoCost;
+                    while (game.rapidFireShotCounter >= 3) {
                         game.ammo--;
-                        game.rapidFireShotCounter = 0;
+                        game.rapidFireShotCounter -= 3;
                     }
                 } else {
-                    game.ammo--;
+                    game.ammo -= shotAmmoCost;
                 }
                 updateUI();
 
-                // Burst Fire: echo the same shot a few more times with a tiny delay
+                // Burst Fire: echo the same shot a few more times with a tiny delay.
+                // Each echo is a full extra volley, so it costs the same ammo as the
+                // original shot (skipped if there isn't enough ammo left by then).
                 if (!isBurstEcho && rp.burstFire > 0) {
                     for (let b = 1; b <= rp.burstFire; b++) {
                         setTimeout(() => {
                             if (game.state !== GameState.PLAYING) return;
+                            if (game.ammo < shotAmmoCost) return;
                             this.fireBullets(this.buildShotSpecs(), mods);
+                            game.ammo -= shotAmmoCost;
+                            updateUI();
                         }, b * 70);
                     }
                 }
+                
+                return true;
             }
 
             draw() {
@@ -1150,7 +1173,6 @@
                 this.hasSplit = false;
                 this.markedForRemoval = false;
                 this.hitEnemies = new Set();
-                this.boomerangReturning = false;
                 
                 let baseWidth, baseHeight;
                 if (type === 'rocket') {
@@ -1167,14 +1189,66 @@
                     this.speed = 5;
                     this.pierceRemaining = 0;
                 } else {
-                    this.width = baseWidth * (this.mods.caliberLevel > 0 ? 2 : 1);
-                    this.height = baseHeight * (this.mods.laserLevel > 0 ? 3 : 1);
+                    // Linear scaling based on the bullet's own base size - each level adds
+                    // another fixed multiple of the ORIGINAL size, it doesn't compound.
+                    const caliberLevel = this.mods.caliberLevel || 0;
+                    const laserLevel = this.mods.laserLevel || 0;
+                    this.width = baseWidth * (1 + caliberLevel * 1.0); // +100% of base width per level
+                    this.height = baseHeight * (1 + laserLevel * 2.0); // +200% of base length per level
+                    
                     this.pierceRemaining = this.mods.pierce || 0;
-                    if (this.mods.laserLevel > 0) this.pierceRemaining += 99; // laser passes through everything in its path
+                    // Laser pierces up to `laserLevel` enemies - beyond that its piercing
+                    // power drops off (it stops piercing further, same as any other bullet).
+                    if (laserLevel > 0) this.pierceRemaining += laserLevel;
                 }
                 this.baseWidth = this.width;
                 this.baseHeight = this.height;
                 this.bloomScale = 1;
+            }
+
+            // Boomerang Shots: bullets bounce off the left/right walls up to
+            // `this.mods.boomerang` times (its level), reflecting their horizontal
+            // motion each time. Once bounces run out, hitting a wall destroys it.
+            applyWallBounce(candidateX) {
+                if (!(this.mods.boomerang > 0)) return candidateX;
+                
+                if (this.bounceVX === undefined) {
+                    this.bounceVX = 2.5 * (this.spreadDirection || (Math.random() < 0.5 ? -1 : 1));
+                    this.bouncesRemaining = this.mods.boomerang;
+                    this.bounceDriftX = 0;
+                }
+                
+                this.bounceDriftX += this.bounceVX;
+                let x = candidateX + this.bounceDriftX;
+                
+                if (x <= 0 || x >= game.width - this.width) {
+                    if (this.bouncesRemaining > 0) {
+                        this.bounceVX *= -1;
+                        this.bouncesRemaining--;
+                        x = Math.max(0, Math.min(game.width - this.width, x));
+                        this.bounceDriftX = x - candidateX;
+                    } else {
+                        this.markedForRemoval = true;
+                    }
+                }
+                
+                return x;
+            }
+
+            // Split Shot: break into extra bullets after travelling 30% of the screen.
+            // The net new bullets created (count - 1, since the original is replaced)
+            // cost extra ammo, same as any other power-up that adds bullets to a shot.
+            spawnSplitChildren(count) {
+                this.hasSplit = true;
+                this.markedForRemoval = true;
+                const childMods = Object.assign({}, this.mods, {split: 0});
+                for (let i = 0; i < count; i++) {
+                    const spread = (i - (count - 1) / 2) * 1.4 || (i % 2 === 0 ? 1 : -1);
+                    const child = new Bullet(this.x, this.y, spread, this.type, this.angle, childMods);
+                    game.pendingBullets.push(child);
+                }
+                game.ammo = Math.max(0, game.ammo - (count - 1));
+                updateUI();
             }
 
             update() {
@@ -1188,18 +1262,37 @@
 
                 if (this.type === 'rapidfire') {
                     this.y -= this.speed * Math.cos(this.angle);
-                    this.x += this.speed * Math.sin(this.angle);
+                    this.rapidDriftX = (this.rapidDriftX || 0) + this.speed * Math.sin(this.angle);
+                    
+                    let waveOffset = 0;
+                    if (this.mods.wave) {
+                        const traveled = Math.abs(this.startY - this.y);
+                        const amplitude = 10 + this.mods.wave * 6;
+                        waveOffset = Math.sin(traveled * 0.05) * amplitude;
+                    }
+                    this.x = this.applyWallBounce(this.spawnX + this.rapidDriftX + waveOffset);
+                    
+                    if (this.mods.bloom) {
+                        const traveled = Math.min(game.height, Math.abs(this.startY - this.y));
+                        const t = traveled / game.height;
+                        this.bloomScale = 1 + t * 0.1 * (1 + this.mods.bloom);
+                        this.width = this.baseWidth * this.bloomScale;
+                        this.height = this.baseHeight * this.bloomScale;
+                    }
+                    
+                    if (this.mods.split > 0 && !this.hasSplit) {
+                        const traveled = Math.abs(this.startY - this.y);
+                        if (traveled >= game.height * 0.3) {
+                            this.spawnSplitChildren(2 + (this.mods.split - 1));
+                        }
+                    }
                     return;
                 }
 
-                if (this.boomerangReturning) {
-                    this.y += this.speed;
-                } else {
-                    this.y -= this.speed;
-                }
+                this.y -= this.speed;
 
                 if (this.spreadDirection !== 0) {
-                    this.driftX += this.spreadDirection * (this.boomerangReturning ? -2 : 2);
+                    this.driftX += this.spreadDirection * 2;
                 }
 
                 let waveOffset = 0;
@@ -1208,7 +1301,7 @@
                     const amplitude = 10 + this.mods.wave * 6;
                     waveOffset = Math.sin(traveled * 0.05) * amplitude;
                 }
-                this.x = this.spawnX + this.driftX + waveOffset;
+                this.x = this.applyWallBounce(this.spawnX + this.driftX + waveOffset);
 
                 // Bullet Bloom: grows the farther it travels
                 if (this.mods.bloom) {
@@ -1219,30 +1312,11 @@
                     this.height = this.baseHeight * this.bloomScale;
                 }
 
-                // Boomerang Shots: curve back after covering 75% of the distance from
-                // where it was fired up to the top of the screen.
-                if (this.mods.boomerang && !this.boomerangReturning) {
-                    const traveled = Math.abs(this.startY - this.y);
-                    const boomerangRange = this.startY * 0.75;
-                    if (traveled >= boomerangRange) {
-                        this.boomerangReturning = true;
-                        this.hitEnemies.clear();
-                    }
-                }
-
                 // Split Shot: break into extra bullets after travelling 30% of the screen
                 if (this.mods.split > 0 && !this.hasSplit) {
                     const traveled = Math.abs(this.startY - this.y);
                     if (traveled >= game.height * 0.3) {
-                        this.hasSplit = true;
-                        this.markedForRemoval = true;
-                        const count = 2 + (this.mods.split - 1);
-                        const childMods = Object.assign({}, this.mods, {split: 0});
-                        for (let i = 0; i < count; i++) {
-                            const spread = (i - (count - 1) / 2) * 1.4 || (i % 2 === 0 ? 1 : -1);
-                            const child = new Bullet(this.x, this.y, spread, this.type, this.angle, childMods);
-                            game.pendingBullets.push(child);
-                        }
+                        this.spawnSplitChildren(2 + (this.mods.split - 1));
                     }
                 }
             }
@@ -3710,9 +3784,7 @@
             }
             
             const pool = POWERUP_KEYS.slice();
-            // Boomerang Shots can only be picked once - drop it from the pool if already owned
             const filteredPool = pool.filter(key => {
-                if (key === 'boomerangShots' && (game.runPowerups.boomerangShots || 0) >= 1) return false;
                 const maxLevel = POWERUP_DEFS[key].maxLevel;
                 if ((game.runPowerups[key] || 0) >= maxLevel) return false;
                 return true;
@@ -3788,7 +3860,6 @@
                 });
             } else {
                 const pool = POWERUP_KEYS.filter(key => {
-                    if (key === 'boomerangShots' && (game.runPowerups.boomerangShots || 0) >= 1) return false;
                     return (game.runPowerups[key] || 0) < POWERUP_DEFS[key].maxLevel;
                 });
                 
